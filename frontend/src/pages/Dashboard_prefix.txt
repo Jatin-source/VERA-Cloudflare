@@ -1,0 +1,220 @@
+import React, { useState } from 'react';
+import { 
+  ShieldCheck, 
+  Mic, 
+  Activity, 
+  MessageSquareWarning, 
+  AlertOctagon,
+  Loader2,
+  Radio,
+  FileAudio,
+  FileText,
+  Fingerprint,
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle2
+} from 'lucide-react';
+import { api, type SessionResponse, type EvidenceResponse } from '../services/api';
+import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import { useLiveDetection } from '../hooks/useLiveDetection';
+
+interface BatchRiskResult {
+  overall_risk_score: number;
+  risk_level: string;
+  contributing_signals: string[];
+  confidence?: number;
+  voice_integrity_score?: number;
+  voice_label?: string;
+  voice_confidence?: number;
+  speaker_similarity_score?: number | null;
+  transcript?: string;
+}
+
+interface BatchDecisionResult {
+  decision: string;
+  escalated?: boolean;
+}
+
+type AnalysisStage =
+  | 'idle'
+  | 'decoding'
+  | 'voice'
+  | 'speech'
+  | 'risk'
+  | 'policy'
+  | 'done'
+  | 'error';
+
+const STAGE_LABELS: Record<AnalysisStage, string> = {
+  idle: '',
+  decoding: 'Decoding audio...',
+  voice: 'Analyzing voice integrity...',
+  speech: 'Transcribing speech...',
+  risk: 'Calculating risk score...',
+  policy: 'Evaluating policy...',
+  done: 'Analysis complete.',
+  error: 'Analysis failed.',
+};
+
+const Dashboard: React.FC = () => {
+  const [activeSession, setActiveSession] = useState<SessionResponse | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [detectionMode, setDetectionMode] = useState<'batch' | 'Live'>('batch');
+
+  const [analysisStage, setAnalysisStage] = useState<AnalysisStage>('idle');
+  const [batchRisk, setBatchRisk] = useState<BatchRiskResult | null>(null);
+  const [batchDecision, setBatchDecision] = useState<BatchDecisionResult | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [evidenceData, setEvidenceData] = useState<EvidenceResponse['data'] | null>(null);
+
+  const {
+    isRecording,
+    recordingTime,
+    audioBlob,
+    error: recorderError,
+    startRecording,
+    stopRecording,
+    clearRecording,
+  } = useAudioRecorder();
+
+  const {
+    connectionState,
+    telemetry,
+    telemetryHistory,
+    error: liveError,
+    startLiveDetection,
+    stopLiveDetection,
+  } = useLiveDetection();
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleStartSession = async () => {
+    setIsInitializing(true);
+    setError(null);
+    setBatchRisk(null);
+    setBatchDecision(null);
+    setDecisionError(null);
+    setEvidenceData(null);
+    setAnalysisStage('idle');
+    clearRecording();
+    if (connectionState !== 'Disconnected') stopLiveDetection();
+    try {
+      const session = await api.createSession();
+      setActiveSession(session);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to connect to VERA backend.');
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
+  const handleRunAnalysis = async () => {
+    if (!activeSession || !audioBlob) return;
+
+    setBatchRisk(null);
+    setBatchDecision(null);
+    setDecisionError(null);
+    setEvidenceData(null);
+    setError(null);
+
+    setAnalysisStage('decoding');
+
+    try {
+      setAnalysisStage('voice');
+      let riskRes;
+      try {
+        riskRes = await api.analyzeRisk(activeSession.session_id, audioBlob);
+      } catch (riskErr) {
+        setError(riskErr instanceof Error ? riskErr.message : 'Risk analysis failed.');
+        setAnalysisStage('error');
+        return;
+      }
+
+      const ra = riskRes.data.risk_analysis as {
+        overall_risk_score: number;
+        risk_level: string;
+        contributing_signals: string[];
+        confidence?: number;
+        voice_integrity_score?: number;
+        voice_label?: string;
+        voice_confidence?: number;
+        speaker_similarity_score?: number | null;
+      };
+      const extractedRisk: BatchRiskResult = {
+        overall_risk_score: ra.overall_risk_score,
+        risk_level: ra.risk_level,
+        contributing_signals: ra.contributing_signals ?? [],
+        confidence: ra.confidence,
+        voice_integrity_score: ra.voice_integrity_score,
+        voice_label: ra.voice_label,
+        voice_confidence: ra.voice_confidence,
+        speaker_similarity_score: ra.speaker_similarity_score ?? null,
+        transcript: riskRes.data.transcript ?? '',
+      };
+
+      setBatchRisk(extractedRisk);
+      setAnalysisStage('policy');
+
+      try {
+        const decisionRes = await api.getDecision(activeSession.session_id, audioBlob);
+        setBatchDecision(decisionRes.data.policy);
+      } catch (decErr) {
+        setDecisionError(
+          decErr instanceof Error ? decErr.message : 'Policy decision unavailable.'
+        );
+      }
+
+      try {
+        const evidenceRes = await api.generateEvidence(activeSession.session_id, audioBlob);
+        if (evidenceRes?.data) setEvidenceData(evidenceRes.data);
+      } catch {
+        // Evidence failure is non-fatal
+      }
+
+      setAnalysisStage('done');
+    } catch (unexpectedErr) {
+      setError(
+        unexpectedErr instanceof Error ? unexpectedErr.message : 'Unexpected analysis error.'
+      );
+      setAnalysisStage('error');
+    }
+  };
+
+  const displayRiskData =
+    detectionMode === 'Live' && telemetry
+      ? {
+          overall_risk_score: telemetry.overall_risk_score,
+          risk_level: telemetry.risk_level ?? 'unavailable',
+          contributing_signals: telemetry.signals ?? [],
+          transcript: telemetry.transcript,
+          voice_integrity_score: telemetry.voice_integrity_score,
+        }
+      : batchRisk
+      ? {
+          overall_risk_score: batchRisk.overall_risk_score,
+          risk_level: batchRisk.risk_level,
+          contributing_signals: batchRisk.contributing_signals,
+          transcript: batchRisk.transcript,
+          voice_integrity_score: batchRisk.voice_integrity_score,
+        }
+      : null;
+
+  const displayDecisionData =
+    detectionMode === 'Live' && telemetry
+      ? { decision: telemetry.decision ?? 'unavailable' }
+      : batchDecision;
+
+  const isProcessing =
+    (analysisStage as string) !== 'idle' && analysisStage !== 'done' && analysisStage !== 'error';
+
+  const isMicActive =
+    isRecording ||
+    connectionState === 'Connecting' ||
+    connectionState === 'Live' ||
+    connectionState === 'Processing';
+
