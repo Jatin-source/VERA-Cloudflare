@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import health, websocket, sessions, voice_profiles
+from app.api.routes import health, websocket, sessions, voice_profiles, signaling
 from app.db.database import engine, Base
 
 logger = logging.getLogger("vera.startup")
@@ -62,6 +62,7 @@ app.include_router(health.router, prefix=settings.API_V1_STR, tags=["health"])
 app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}/sessions", tags=["sessions"])
 app.include_router(websocket.router, tags=["websocket"])
 app.include_router(voice_profiles.router, prefix=f"{settings.API_V1_STR}/voice-profiles", tags=["voice-profiles"])
+app.include_router(signaling.router, tags=["signaling"])
 
 @app.get("/")
 def root():

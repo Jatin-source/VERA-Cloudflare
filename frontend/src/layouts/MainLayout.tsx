@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { 
   Home, 
+  PhoneCall,
   Clock, 
   Users, 
   FileText,
@@ -26,6 +27,7 @@ const MainLayout: React.FC = () => {
 
           <nav className="space-y-2">
             <NavItem to="/" icon={<Home size={18} />} label="Dashboard" exact />
+            <NavItem to="/call" icon={<PhoneCall size={18} />} label="VoIP Call" />
             <NavItem to="/sessions" icon={<Clock size={18} />} label="Sessions" />
             <NavItem to="/voice-profiles" icon={<Users size={18} />} label="Voice Profiles" />
             <NavItem to="/evidence" icon={<FileText size={18} />} label="Evidence" />
@@ -49,7 +51,8 @@ const MainLayout: React.FC = () => {
 
         {/* Android Native Bottom Navigation Bar */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0a101d]/95 backdrop-blur-md border-t border-[#1a2333] z-50 flex items-center justify-around py-2 px-1 pb-[max(0.6rem,env(safe-area-inset-bottom))] shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
-          <MobileNavItem to="/" icon={<Home size={20} />} label="Live Call" exact />
+          <MobileNavItem to="/" icon={<Home size={20} />} label="Live" exact />
+          <MobileNavItem to="/call" icon={<PhoneCall size={20} />} label="Call" />
           <MobileNavItem to="/sessions" icon={<Clock size={20} />} label="Sessions" />
           <MobileNavItem to="/voice-profiles" icon={<Users size={20} />} label="Profiles" />
           <MobileNavItem to="/evidence" icon={<FileText size={20} />} label="Evidence" />
