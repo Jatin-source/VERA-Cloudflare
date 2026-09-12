@@ -14,6 +14,8 @@ import {
   Mic, 
   MicOff, 
   Volume2,
+  VolumeX,
+  Unlock,
   Activity,
   Wifi,
   RadioTower,
@@ -55,6 +57,10 @@ const CallScreen: React.FC = () => {
     isAiConnected,
     fullTranscript,
     detectedSignals,
+    isSpeakerOn,
+    toggleSpeaker,
+    isTouchLocked,
+    toggleTouchLock,
   } = useVoIPSignaling();
 
   const [targetUser, setTargetUser] = useState('');
@@ -343,10 +349,27 @@ const CallScreen: React.FC = () => {
               </button>
 
               <button
-                className="p-4 bg-[#121d30] border border-[#1a2333] text-gray-300 hover:text-white rounded-2xl transition-all"
-                title="Speaker Audio"
+                onClick={toggleSpeaker}
+                className={`p-4 rounded-2xl border transition-all ${
+                  isSpeakerOn
+                    ? 'bg-[#121d30] border-[#1a2333] text-blue-400 hover:text-white'
+                    : 'bg-amber-600/20 border-amber-500 text-amber-400'
+                }`}
+                title={isSpeakerOn ? 'Speakerphone ON' : 'Earpiece Mode'}
               >
-                <Volume2 size={22} />
+                {isSpeakerOn ? <Volume2 size={22} /> : <VolumeX size={22} />}
+              </button>
+
+              <button
+                onClick={toggleTouchLock}
+                className={`p-4 rounded-2xl border transition-all ${
+                  isTouchLocked
+                    ? 'bg-blue-600/20 border-blue-500 text-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]'
+                    : 'bg-[#121d30] border-[#1a2333] text-gray-300 hover:text-white'
+                }`}
+                title="Ear Guard (Prevent Cheek Touches)"
+              >
+                <Lock size={22} />
               </button>
             </div>
           </div>
@@ -566,6 +589,25 @@ const CallScreen: React.FC = () => {
                 <Phone size={24} />
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Milestone 7: Ear Guard Screen Touch Lock Overlay */}
+      {isTouchLocked && callState === 'CONNECTED' && (
+        <div 
+          onClick={toggleTouchLock}
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center cursor-pointer select-none"
+        >
+          <div className="w-20 h-20 rounded-full bg-blue-600/20 border border-blue-500/50 flex items-center justify-center text-blue-400 mb-6 animate-pulse">
+            <Lock size={36} />
+          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Ear Guard Active</h3>
+          <p className="text-sm text-gray-400 max-w-xs mb-8">
+            Screen is touch-protected to prevent accidental cheek presses while holding the phone to your ear.
+          </p>
+          <div className="px-6 py-3 bg-[#121d30] border border-[#1a2333] rounded-2xl text-blue-400 font-semibold text-xs flex items-center gap-2">
+            <Unlock size={16} />
+            <span>Tap Anywhere to Unlock</span>
           </div>
         </div>
       )}

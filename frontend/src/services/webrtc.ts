@@ -41,6 +41,10 @@ class WebRTCManager {
     return this.remoteStream;
   }
 
+  public getRemoteAudioElement(): HTMLAudioElement | null {
+    return this.remoteAudio;
+  }
+
   public onRemoteStream(listener: StreamListener): () => void {
     this.streamListeners.add(listener);
     if (this.remoteStream) {

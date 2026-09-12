@@ -4,6 +4,7 @@ import { webrtcManager } from '../services/webrtc';
 import { remoteAudioTap } from '../services/audioTap';
 import { downsampleTo16k, audioChunkAccumulator, type AudioChunk } from '../services/audioConverter';
 import { veraPipeline, type VeraTelemetry } from '../services/veraPipeline';
+import { deviceAudioService } from '../services/deviceAudio';
 import type { CallState, SignalingMessage } from '../types/voip';
 
 export function useVoIPSignaling() {
@@ -28,6 +29,8 @@ export function useVoIPSignaling() {
   const [isAiConnected, setIsAiConnected] = useState<boolean>(false);
   const [fullTranscript, setFullTranscript] = useState<string>('');
   const [detectedSignals, setDetectedSignals] = useState<Array<any>>([]);
+  const [isSpeakerOn, setIsSpeakerOn] = useState<boolean>(true);
+  const [isTouchLocked, setIsTouchLocked] = useState<boolean>(false);
 
   const timerRef = useRef<any>(null);
 
@@ -138,14 +141,23 @@ export function useVoIPSignaling() {
     };
   }, []);
 
-  // Timer for connected call
+  // Milestone 7: Telephony tones, vibration, screen wake lock & timer
   useEffect(() => {
-    if (callState === 'CONNECTED') {
+    if (callState === 'INCOMING_RINGING') {
+      deviceAudioService.startIncomingRingtone();
+    } else if (callState === 'OUTGOING_RINGING') {
+      deviceAudioService.startOutgoingRingback();
+    } else if (callState === 'CONNECTED') {
+      deviceAudioService.stopRingtone();
+      deviceAudioService.acquireWakeLock();
       setCallDuration(0);
       timerRef.current = setInterval(() => {
         setCallDuration((d) => d + 1);
       }, 1000);
     } else {
+      deviceAudioService.stopRingtone();
+      deviceAudioService.releaseWakeLock();
+      setIsTouchLocked(false);
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -155,6 +167,8 @@ export function useVoIPSignaling() {
       }
     }
     return () => {
+      deviceAudioService.stopRingtone();
+      deviceAudioService.releaseWakeLock();
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [callState]);
@@ -315,6 +329,15 @@ export function useVoIPSignaling() {
     webrtcManager.setMuted(nextMuted);
   }, [isMuted]);
 
+  const toggleSpeaker = useCallback(() => {
+    const nextState = deviceAudioService.toggleSpeakerphone(webrtcManager.getRemoteAudioElement());
+    setIsSpeakerOn(nextState);
+  }, []);
+
+  const toggleTouchLock = useCallback(() => {
+    setIsTouchLocked((prev) => !prev);
+  }, []);
+
   return {
     currentUser,
     switchUser,
@@ -341,5 +364,9 @@ export function useVoIPSignaling() {
     isAiConnected,
     fullTranscript,
     detectedSignals,
+    isSpeakerOn,
+    toggleSpeaker,
+    isTouchLocked,
+    toggleTouchLock,
   };
 }
