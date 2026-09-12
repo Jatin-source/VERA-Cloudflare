@@ -56,7 +56,7 @@ export interface EvidenceResponse {
   };
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://his-referring-cons-floating.trycloudflare.com';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://cocktail-street-warranty-cons.trycloudflare.com';
 
 class ApiError extends Error {
   status: number;
