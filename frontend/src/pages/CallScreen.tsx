@@ -15,7 +15,8 @@ import {
   Activity,
   Wifi,
   RadioTower,
-  Cpu
+  Cpu,
+  Layers
 } from 'lucide-react';
 import { useVoIPSignaling } from '../hooks/useVoIPSignaling';
 
@@ -43,6 +44,7 @@ const CallScreen: React.FC = () => {
     webrtcState,
     isAudioTapActive,
     remoteAudioLevel,
+    chunksProcessedCount,
   } = useVoIPSignaling();
 
   const [targetUser, setTargetUser] = useState('');
@@ -266,12 +268,12 @@ const CallScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Milestone 3: VERA Audio Tap Live Telemetry Card */}
-          <div className="p-3.5 bg-[#091120] border border-blue-500/30 rounded-2xl space-y-2 text-left shadow-[0_0_20px_rgba(37,99,235,0.1)]">
+          {/* Milestone 3 & 4: VERA Audio Tap & 16kHz PCM Chunker Telemetry */}
+          <div className="p-3.5 bg-[#091120] border border-blue-500/30 rounded-2xl space-y-2.5 text-left shadow-[0_0_20px_rgba(37,99,235,0.1)]">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-xs font-semibold text-white">
                 <RadioTower size={14} className="text-blue-400" />
-                <span>VERA Remote Audio Tap</span>
+                <span>VERA AI Audio Tap & Chunker</span>
               </div>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono flex items-center gap-1 ${
                 isAudioTapActive 
@@ -297,9 +299,20 @@ const CallScreen: React.FC = () => {
               </div>
             </div>
 
+            {/* Milestone 4: PCM Downsampling Telemetry */}
+            <div className="pt-1 border-t border-[#1a2333] flex items-center justify-between text-[11px] font-mono text-gray-300">
+              <div className="flex items-center space-x-1.5">
+                <Layers size={13} className="text-blue-400" />
+                <span>16kHz Chunks:</span>
+              </div>
+              <span className="px-2 py-0.5 rounded bg-blue-950/80 border border-blue-500/30 text-blue-400 font-bold">
+                {chunksProcessedCount} Ready (1.0s)
+              </span>
+            </div>
+
             <p className="text-[10px] text-gray-500 flex items-center gap-1">
               <Cpu size={11} className="text-blue-400 shrink-0" />
-              <span>Passive Web Audio tap • Speakerphone isolated</span>
+              <span>Downsampled to 16,000Hz 16-bit PCM • Ready for AI</span>
             </p>
           </div>
 

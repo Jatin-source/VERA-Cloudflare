@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { signalingService } from '../services/signaling';
 import { webrtcManager } from '../services/webrtc';
 import { remoteAudioTap } from '../services/audioTap';
+import { downsampleTo16k, audioChunkAccumulator, type AudioChunk } from '../services/audioConverter';
 import type { CallState, SignalingMessage } from '../types/voip';
 
 export function useVoIPSignaling() {
@@ -19,6 +20,8 @@ export function useVoIPSignaling() {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isAudioTapActive, setIsAudioTapActive] = useState<boolean>(false);
   const [remoteAudioLevel, setRemoteAudioLevel] = useState<number>(0);
+  const [chunksProcessedCount, setChunksProcessedCount] = useState<number>(0);
+  const [lastChunk, setLastChunk] = useState<AudioChunk | null>(null);
 
   const timerRef = useRef<any>(null);
 
@@ -44,20 +47,44 @@ export function useVoIPSignaling() {
     };
   }, []);
 
-  // Milestone 3: Auto-engage Audio Tap when call is connected and remote stream is ready
+  // Milestone 3 & 4: Audio Tap & Downsampling Pipeline
   useEffect(() => {
     if (callState === 'CONNECTED' && remoteStream) {
       console.log('[VoIP] Engaging VERA remote audio tap for incoming stream');
       remoteAudioTap.start(remoteStream);
       setIsAudioTapActive(true);
+      setChunksProcessedCount(0);
+      setLastChunk(null);
+      audioChunkAccumulator.reset();
     } else {
       if (remoteAudioTap.getIsActive()) {
-        console.log('[VoIP] Stopping VERA remote audio tap');
+        console.log('[VoIP] Stopping VERA remote audio tap and flushing chunk buffer');
         remoteAudioTap.stop();
+        audioChunkAccumulator.flush();
         setIsAudioTapActive(false);
       }
     }
   }, [callState, remoteStream]);
+
+  // Hook Audio Tap frames directly into the 16kHz Downsampler & Chunker
+  useEffect(() => {
+    const unsubFrames = remoteAudioTap.onFrame((frameData, sampleRate) => {
+      // Downsample decoded WebRTC audio to 16kHz 16-bit mono PCM
+      const pcm16 = downsampleTo16k(frameData, sampleRate);
+      // Feed into 1.0s chunk accumulator
+      audioChunkAccumulator.feed(pcm16);
+    });
+
+    const unsubChunks = audioChunkAccumulator.onChunk((chunk) => {
+      setChunksProcessedCount((c) => c + 1);
+      setLastChunk(chunk);
+    });
+
+    return () => {
+      unsubFrames();
+      unsubChunks();
+    };
+  }, []);
 
   // Audio level listener for VU meter
   useEffect(() => {
@@ -136,6 +163,7 @@ export function useVoIPSignaling() {
         case 'call:reject':
           setCallState('ENDED');
           remoteAudioTap.stop();
+          audioChunkAccumulator.flush();
           webrtcManager.cleanup();
           setTimeout(() => {
             setCallState('IDLE');
@@ -148,6 +176,7 @@ export function useVoIPSignaling() {
         case 'call:end':
           setCallState('ENDED');
           remoteAudioTap.stop();
+          audioChunkAccumulator.flush();
           webrtcManager.cleanup();
           setTimeout(() => {
             setCallState('IDLE');
@@ -212,6 +241,7 @@ export function useVoIPSignaling() {
     if (incomingCallData) {
       signalingService.sendReject(incomingCallData.caller_id, incomingCallData.call_id, reason);
       remoteAudioTap.stop();
+      audioChunkAccumulator.flush();
       webrtcManager.cleanup();
       setCallState('IDLE');
       setActiveCallId(null);
@@ -225,6 +255,7 @@ export function useVoIPSignaling() {
       signalingService.sendEnd(activeCallId, 'hangup');
     }
     remoteAudioTap.stop();
+    audioChunkAccumulator.flush();
     webrtcManager.cleanup();
     setCallState('ENDED');
     setTimeout(() => {
@@ -260,5 +291,7 @@ export function useVoIPSignaling() {
     remoteStream,
     isAudioTapActive,
     remoteAudioLevel,
+    chunksProcessedCount,
+    lastChunk,
   };
 }
