@@ -56,7 +56,27 @@ export interface EvidenceResponse {
   };
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8010';
+export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://faq-coordinator-cosmetic-screensaver.trycloudflare.com';
+
+export function getBaseUrl(): string {
+  try {
+    const saved = localStorage.getItem('vera_server_url');
+    if (saved && saved.trim()) {
+      return saved.trim().replace(/\/+$/, '');
+    }
+  } catch {}
+  return DEFAULT_BASE_URL.replace(/\/+$/, '');
+}
+
+export function setBaseUrl(url: string) {
+  try {
+    if (url && url.trim()) {
+      localStorage.setItem('vera_server_url', url.trim().replace(/\/+$/, ''));
+    } else {
+      localStorage.removeItem('vera_server_url');
+    }
+  } catch {}
+}
 
 class ApiError extends Error {
   status: number;
@@ -70,7 +90,8 @@ class ApiError extends Error {
 
 async function fetchWithHandle(endpoint: string, options?: RequestInit) {
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+    const baseUrl = getBaseUrl();
+    const response = await fetch(`${baseUrl}${endpoint}`, {
       ...options,
     });
 

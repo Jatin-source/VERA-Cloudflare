@@ -240,3 +240,6 @@ __marimo__/
 
 # Mobile APK
 *.apk
+
+# Cloudflared binary
+cloudflared.exe
