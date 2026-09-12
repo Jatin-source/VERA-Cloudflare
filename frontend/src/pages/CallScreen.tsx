@@ -13,7 +13,9 @@ import {
   MicOff, 
   Volume2,
   Activity,
-  Wifi
+  Wifi,
+  RadioTower,
+  Cpu
 } from 'lucide-react';
 import { useVoIPSignaling } from '../hooks/useVoIPSignaling';
 
@@ -39,6 +41,8 @@ const CallScreen: React.FC = () => {
     isMuted,
     toggleMute,
     webrtcState,
+    isAudioTapActive,
+    remoteAudioLevel,
   } = useVoIPSignaling();
 
   const [targetUser, setTargetUser] = useState('');
@@ -231,10 +235,10 @@ const CallScreen: React.FC = () => {
 
       {/* CONNECTED IN-CALL STATE */}
       {callState === 'CONNECTED' && (
-        <div className="bg-[#0a101d] border border-emerald-500/40 p-8 md:p-10 rounded-3xl shadow-[0_0_40px_rgba(16,185,129,0.15)] max-w-md mx-auto text-center space-y-6">
-          <div className="relative w-24 h-24 mx-auto">
-            <div className="w-24 h-24 rounded-full bg-[#102026] border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-              <User size={44} />
+        <div className="bg-[#0a101d] border border-emerald-500/40 p-6 md:p-8 rounded-3xl shadow-[0_0_40px_rgba(16,185,129,0.15)] max-w-md mx-auto text-center space-y-5">
+          <div className="relative w-20 h-20 mx-auto">
+            <div className="w-20 h-20 rounded-full bg-[#102026] border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+              <User size={38} />
             </div>
             {webrtcState === 'connected' && (
               <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-emerald-500 border-2 border-[#0a101d] flex items-center justify-center text-white" title="WebRTC Active">
@@ -245,7 +249,7 @@ const CallScreen: React.FC = () => {
 
           <div>
             <h2 className="text-2xl font-bold text-white">{peerId}</h2>
-            <div className="inline-flex items-center px-3 py-1 mt-2 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 text-xs font-mono">
+            <div className="inline-flex items-center px-3 py-1 mt-1 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 text-xs font-mono">
               <Clock size={12} className="mr-1.5" /> {formatTimer(callDuration)}
             </div>
           </div>
@@ -262,8 +266,45 @@ const CallScreen: React.FC = () => {
             </div>
           </div>
 
+          {/* Milestone 3: VERA Audio Tap Live Telemetry Card */}
+          <div className="p-3.5 bg-[#091120] border border-blue-500/30 rounded-2xl space-y-2 text-left shadow-[0_0_20px_rgba(37,99,235,0.1)]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-xs font-semibold text-white">
+                <RadioTower size={14} className="text-blue-400" />
+                <span>VERA Remote Audio Tap</span>
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono flex items-center gap-1 ${
+                isAudioTapActive 
+                  ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40' 
+                  : 'bg-gray-800 text-gray-400'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isAudioTapActive ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`}></span>
+                {isAudioTapActive ? 'TAP ACTIVE' : 'TAP READY'}
+              </span>
+            </div>
+
+            {/* Live Audio Level Meter */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[10px] text-gray-400 font-mono">
+                <span>Incoming Voice Level</span>
+                <span>{Math.round(remoteAudioLevel * 100)}%</span>
+              </div>
+              <div className="w-full h-2 bg-[#070b14] rounded-full overflow-hidden border border-[#1a2333]">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 via-emerald-400 to-amber-400 transition-all duration-75 rounded-full"
+                  style={{ width: `${Math.max(4, Math.min(100, remoteAudioLevel * 100))}%` }}
+                ></div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-gray-500 flex items-center gap-1">
+              <Cpu size={11} className="text-blue-400 shrink-0" />
+              <span>Passive Web Audio tap • Speakerphone isolated</span>
+            </p>
+          </div>
+
           {/* Call Controls */}
-          <div className="flex items-center justify-center space-x-4 pt-2">
+          <div className="flex items-center justify-center space-x-4 pt-1">
             <button
               onClick={toggleMute}
               className={`p-4 rounded-2xl border transition-all ${

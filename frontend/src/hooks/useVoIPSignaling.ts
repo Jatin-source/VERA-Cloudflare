@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { signalingService } from '../services/signaling';
 import { webrtcManager } from '../services/webrtc';
+import { remoteAudioTap } from '../services/audioTap';
 import type { CallState, SignalingMessage } from '../types/voip';
 
 export function useVoIPSignaling() {
@@ -16,6 +17,8 @@ export function useVoIPSignaling() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [webrtcState, setWebrtcState] = useState<RTCPeerConnectionState>('closed');
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isAudioTapActive, setIsAudioTapActive] = useState<boolean>(false);
+  const [remoteAudioLevel, setRemoteAudioLevel] = useState<number>(0);
 
   const timerRef = useRef<any>(null);
 
@@ -38,6 +41,31 @@ export function useVoIPSignaling() {
     return () => {
       unsubStream();
       unsubConn();
+    };
+  }, []);
+
+  // Milestone 3: Auto-engage Audio Tap when call is connected and remote stream is ready
+  useEffect(() => {
+    if (callState === 'CONNECTED' && remoteStream) {
+      console.log('[VoIP] Engaging VERA remote audio tap for incoming stream');
+      remoteAudioTap.start(remoteStream);
+      setIsAudioTapActive(true);
+    } else {
+      if (remoteAudioTap.getIsActive()) {
+        console.log('[VoIP] Stopping VERA remote audio tap');
+        remoteAudioTap.stop();
+        setIsAudioTapActive(false);
+      }
+    }
+  }, [callState, remoteStream]);
+
+  // Audio level listener for VU meter
+  useEffect(() => {
+    const unsubLevel = remoteAudioTap.onLevel((lvl) => {
+      setRemoteAudioLevel(lvl);
+    });
+    return () => {
+      unsubLevel();
     };
   }, []);
 
@@ -107,6 +135,7 @@ export function useVoIPSignaling() {
 
         case 'call:reject':
           setCallState('ENDED');
+          remoteAudioTap.stop();
           webrtcManager.cleanup();
           setTimeout(() => {
             setCallState('IDLE');
@@ -118,6 +147,7 @@ export function useVoIPSignaling() {
 
         case 'call:end':
           setCallState('ENDED');
+          remoteAudioTap.stop();
           webrtcManager.cleanup();
           setTimeout(() => {
             setCallState('IDLE');
@@ -181,6 +211,7 @@ export function useVoIPSignaling() {
   const rejectIncomingCall = useCallback((reason: string = 'declined') => {
     if (incomingCallData) {
       signalingService.sendReject(incomingCallData.caller_id, incomingCallData.call_id, reason);
+      remoteAudioTap.stop();
       webrtcManager.cleanup();
       setCallState('IDLE');
       setActiveCallId(null);
@@ -193,6 +224,7 @@ export function useVoIPSignaling() {
     if (activeCallId) {
       signalingService.sendEnd(activeCallId, 'hangup');
     }
+    remoteAudioTap.stop();
     webrtcManager.cleanup();
     setCallState('ENDED');
     setTimeout(() => {
@@ -226,5 +258,7 @@ export function useVoIPSignaling() {
     toggleMute,
     webrtcState,
     remoteStream,
+    isAudioTapActive,
+    remoteAudioLevel,
   };
 }
