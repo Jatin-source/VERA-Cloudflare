@@ -9,6 +9,41 @@ class SignalingService {
   private handlers: Set<MessageHandler> = new Set();
   private isIntentionalClose: boolean = false;
   private reconnectTimer: any = null;
+  private heartbeatInterval: any = null;
+
+  constructor() {
+    this.setupNetworkListeners();
+  }
+
+  private setupNetworkListeners() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        console.log('[Signaling] Network restored (online), reconnecting...');
+        if (this.currentUserId) {
+          this.connect(this.currentUserId);
+        }
+      });
+      window.addEventListener('offline', () => {
+        console.warn('[Signaling] Network offline detected');
+      });
+    }
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+    this.heartbeatInterval = setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 25000);
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
 
   public connect(userId: string) {
     if (this.ws && this.currentUserId === userId && this.ws.readyState === WebSocket.OPEN) {
@@ -27,6 +62,7 @@ class SignalingService {
 
       this.ws.onopen = () => {
         console.log(`[Signaling] Connected as ${userId}`);
+        this.startHeartbeat();
         if (this.reconnectTimer) {
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
@@ -44,6 +80,7 @@ class SignalingService {
 
       this.ws.onclose = () => {
         console.log(`[Signaling] Disconnected (${userId})`);
+        this.stopHeartbeat();
         this.ws = null;
         if (!this.isIntentionalClose && this.currentUserId) {
           this.reconnectTimer = setTimeout(() => {
@@ -62,13 +99,15 @@ class SignalingService {
 
   public disconnect() {
     this.isIntentionalClose = true;
+    this.stopHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
     if (this.ws) {
       this.ws.close();
-      this.ws = null;
+      this.stopHeartbeat();
+        this.ws = null;
     }
     this.currentUserId = null;
   }
@@ -165,7 +204,18 @@ class SignalingService {
       console.warn('[Signaling] Failed to fetch ice-config, using fallback:', e);
     }
     return {
-      iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }]
+      iceServers: [
+        {
+          urls: [
+            'stun:stun.l.google.com:19302',
+            'stun:stun1.l.google.com:19302',
+            'stun:stun2.l.google.com:19302',
+            'stun:stun3.l.google.com:19302',
+            'stun:stun4.l.google.com:19302',
+            'stun:stun.cloudflare.com:3478'
+          ]
+        }
+      ]
     };
   }
 }

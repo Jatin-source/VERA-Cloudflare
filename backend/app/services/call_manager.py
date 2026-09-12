@@ -154,6 +154,9 @@ class CallManager:
                     "reason": data.get("reason", "hangup")
                 })
 
+        elif msg_type == "ping":
+            await self.send_to_user(user_id, {"type": "pong"})
+
         # Milestone 2 WebRTC Signaling passthrough:
         elif msg_type in ["webrtc:offer", "webrtc:answer", "webrtc:ice"]:
             if not target_id and call_id in self.active_calls:

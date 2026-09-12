@@ -118,6 +118,17 @@ class WebRTCManager {
     pc.onconnectionstatechange = () => {
       console.log('[WebRTC] Connection state:', pc.connectionState);
       this.notifyConnState(pc.connectionState);
+      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+        console.warn('[WebRTC] Connection disrupted, attempting ICE restart...');
+        this.restartIce();
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('[WebRTC] ICE state:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'failed') {
+        this.restartIce();
+      }
     };
 
     this.pc = pc;
@@ -251,6 +262,48 @@ class WebRTCManager {
 
   public getIsMuted(): boolean {
     return this.isMuted;
+  }
+
+  /**
+   * Milestone 8: Perform WebRTC ICE Restart across network transitions
+   */
+  public async restartIce() {
+    if (!this.pc || !this.peerId || !this.callId) return;
+    try {
+      console.log('[WebRTC] Initiating ICE restart renegotiation...');
+      if (typeof this.pc.restartIce === 'function') {
+        this.pc.restartIce();
+      }
+      const offer = await this.pc.createOffer({ iceRestart: true });
+      await this.pc.setLocalDescription(offer);
+      signalingService.sendWebRtcOffer(this.peerId, this.callId, offer);
+      console.log('[WebRTC] ICE restart offer transmitted');
+    } catch (err) {
+      console.error('[WebRTC] Error during ICE restart:', err);
+    }
+  }
+
+  /**
+   * Milestone 8: Collect WebRTC network metrics (RTT latency, jitter, packet loss)
+   */
+  public async getMediaStats(): Promise<{ latencyMs: number; jitter: number; packetsLost: number }> {
+    if (!this.pc) return { latencyMs: 0, jitter: 0, packetsLost: 0 };
+    let latencyMs = 0;
+    let jitter = 0;
+    let packetsLost = 0;
+    try {
+      const stats = await this.pc.getStats();
+      stats.forEach((report: any) => {
+        if (report.type === 'candidate-pair' && report.currentRoundTripTime !== undefined) {
+          latencyMs = Math.round(report.currentRoundTripTime * 1000);
+        }
+        if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+          if (report.jitter !== undefined) jitter = Math.round(report.jitter * 1000);
+          if (report.packetsLost !== undefined) packetsLost = report.packetsLost;
+        }
+      });
+    } catch (_) {}
+    return { latencyMs, jitter, packetsLost };
   }
 
   public cleanup() {
