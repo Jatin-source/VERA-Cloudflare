@@ -56,7 +56,23 @@ export interface EvidenceResponse {
   };
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://cocktail-street-warranty-cons.trycloudflare.com';
+const LOCAL_URL = 'http://127.0.0.1:8000';
+const CLOUDFLARE_URL = 'https://itunes-rather-generate-symbol.trycloudflare.com';
+
+/**
+ * Auto-detect the best API base URL:
+ * - If user is on localhost (dev server), use local backend
+ * - If user is on any other origin (Cloudflare, mobile, etc.), use Cloudflare tunnel
+ */
+export function getBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return LOCAL_URL;
+    }
+  }
+  return CLOUDFLARE_URL;
+}
 
 class ApiError extends Error {
   status: number;
@@ -69,8 +85,9 @@ class ApiError extends Error {
 }
 
 async function fetchWithHandle(endpoint: string, options?: RequestInit) {
+  const baseUrl = getBaseUrl();
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+    const response = await fetch(`${baseUrl}${endpoint}`, {
       ...options,
     });
 
@@ -81,7 +98,7 @@ async function fetchWithHandle(endpoint: string, options?: RequestInit) {
     return await response.json();
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new Error(error instanceof Error ? error.message : 'Unknown network error');
+    throw new Error(error instanceof Error ? error.message : 'Network error – is the backend running?');
   }
 }
 

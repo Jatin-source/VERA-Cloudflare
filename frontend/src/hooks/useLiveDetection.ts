@@ -60,7 +60,9 @@ function mergeTranscripts(existing: string, incoming: string): string {
   return ex + ' ' + inc;
 }
 
-const WS_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/^http/, 'ws');
+import { getBaseUrl } from '../services/api';
+
+const WS_BASE_URL = () => getBaseUrl().replace(/^http/, 'ws');
 
 function floatTo16BitPCM(input: Float32Array): Int16Array {
   const output = new Int16Array(input.length);
@@ -174,7 +176,7 @@ export const useLiveDetection = (): UseLiveDetectionResult => {
         throw new Error('Microphone not supported on this browser.');
       }
 
-      const wsUrl = `${WS_BASE_URL}/api/v1/ws/sessions/${sessionId}`;
+      const wsUrl = `${WS_BASE_URL()}/api/v1/ws/sessions/${sessionId}`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
