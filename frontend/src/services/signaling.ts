@@ -127,6 +127,33 @@ class SignalingService {
     });
   }
 
+  public sendWebRtcOffer(targetId: string, callId: string, sdp: any) {
+    this.send({
+      type: 'webrtc:offer',
+      target_id: targetId,
+      call_id: callId,
+      sdp
+    });
+  }
+
+  public sendWebRtcAnswer(targetId: string, callId: string, sdp: any) {
+    this.send({
+      type: 'webrtc:answer',
+      target_id: targetId,
+      call_id: callId,
+      sdp
+    });
+  }
+
+  public sendIceCandidate(targetId: string, callId: string, candidate: any) {
+    this.send({
+      type: 'webrtc:ice',
+      target_id: targetId,
+      call_id: callId,
+      candidate
+    });
+  }
+
   public async getIceConfig(): Promise<{ iceServers: IceServerConfig[] }> {
     const baseUrl = getBaseUrl();
     try {
@@ -138,7 +165,7 @@ class SignalingService {
       console.warn('[Signaling] Failed to fetch ice-config, using fallback:', e);
     }
     return {
-      iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
+      iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }]
     };
   }
 }

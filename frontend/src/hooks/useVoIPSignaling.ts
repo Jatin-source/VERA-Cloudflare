@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { signalingService } from '../services/signaling';
+import { webrtcManager } from '../services/webrtc';
 import type { CallState, SignalingMessage } from '../types/voip';
 
 export function useVoIPSignaling() {
@@ -12,6 +13,9 @@ export function useVoIPSignaling() {
   const [peerId, setPeerId] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState<number>(0);
   const [incomingCallData, setIncomingCallData] = useState<{ caller_id: string; call_id: string } | null>(null);
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [webrtcState, setWebrtcState] = useState<RTCPeerConnectionState>('closed');
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
   const timerRef = useRef<any>(null);
 
@@ -21,6 +25,20 @@ export function useVoIPSignaling() {
     if (!clean) return;
     localStorage.setItem('vera_voip_user', clean);
     setCurrentUser(clean);
+  }, []);
+
+  // WebRTC remote stream & connection listeners
+  useEffect(() => {
+    const unsubStream = webrtcManager.onRemoteStream((stream) => {
+      setRemoteStream(stream);
+    });
+    const unsubConn = webrtcManager.onConnectionState((state) => {
+      setWebrtcState(state);
+    });
+    return () => {
+      unsubStream();
+      unsubConn();
+    };
   }, []);
 
   // Timer for connected call
@@ -48,8 +66,8 @@ export function useVoIPSignaling() {
   useEffect(() => {
     signalingService.connect(currentUser);
 
-    const unsubscribe = signalingService.onMessage((msg: SignalingMessage) => {
-      console.log('[useVoIPSignaling] Event received:', msg);
+    const unsubscribe = signalingService.onMessage(async (msg: SignalingMessage) => {
+      console.log('[useVoIPSignaling] Event received:', msg.type);
 
       switch (msg.type) {
         case 'users:list':
@@ -76,13 +94,20 @@ export function useVoIPSignaling() {
           break;
 
         case 'call:accept':
-          if (msg.call_id) {
+          if (msg.call_id && peerId) {
             setCallState('CONNECTED');
+            // Caller starts WebRTC media
+            try {
+              await webrtcManager.startAsCaller(peerId, msg.call_id);
+            } catch (err) {
+              console.error('[VoIP] Error starting caller WebRTC:', err);
+            }
           }
           break;
 
         case 'call:reject':
           setCallState('ENDED');
+          webrtcManager.cleanup();
           setTimeout(() => {
             setCallState('IDLE');
             setActiveCallId(null);
@@ -93,6 +118,7 @@ export function useVoIPSignaling() {
 
         case 'call:end':
           setCallState('ENDED');
+          webrtcManager.cleanup();
           setTimeout(() => {
             setCallState('IDLE');
             setActiveCallId(null);
@@ -100,13 +126,32 @@ export function useVoIPSignaling() {
             setIncomingCallData(null);
           }, 2000);
           break;
+
+        // WebRTC Signaling Events
+        case 'webrtc:offer':
+          if (msg.sdp) {
+            await webrtcManager.handleOffer(msg.sdp);
+          }
+          break;
+
+        case 'webrtc:answer':
+          if (msg.sdp) {
+            await webrtcManager.handleAnswer(msg.sdp);
+          }
+          break;
+
+        case 'webrtc:ice':
+          if (msg.candidate) {
+            await webrtcManager.handleIceCandidate(msg.candidate);
+          }
+          break;
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [currentUser]);
+  }, [currentUser, peerId]);
 
   // Call Actions
   const initiateCall = useCallback((calleeId: string) => {
@@ -117,10 +162,18 @@ export function useVoIPSignaling() {
     signalingService.sendInvite(calleeId, callId);
   }, []);
 
-  const acceptIncomingCall = useCallback(() => {
+  const acceptIncomingCall = useCallback(async () => {
     if (incomingCallData) {
       setCallState('CONNECTED');
       signalingService.sendAccept(incomingCallData.caller_id, incomingCallData.call_id);
+      
+      // Callee starts WebRTC media
+      try {
+        await webrtcManager.startAsCallee(incomingCallData.caller_id, incomingCallData.call_id);
+      } catch (err) {
+        console.error('[VoIP] Error starting callee WebRTC:', err);
+      }
+
       setIncomingCallData(null);
     }
   }, [incomingCallData]);
@@ -128,6 +181,7 @@ export function useVoIPSignaling() {
   const rejectIncomingCall = useCallback((reason: string = 'declined') => {
     if (incomingCallData) {
       signalingService.sendReject(incomingCallData.caller_id, incomingCallData.call_id, reason);
+      webrtcManager.cleanup();
       setCallState('IDLE');
       setActiveCallId(null);
       setPeerId(null);
@@ -139,6 +193,7 @@ export function useVoIPSignaling() {
     if (activeCallId) {
       signalingService.sendEnd(activeCallId, 'hangup');
     }
+    webrtcManager.cleanup();
     setCallState('ENDED');
     setTimeout(() => {
       setCallState('IDLE');
@@ -147,6 +202,12 @@ export function useVoIPSignaling() {
       setIncomingCallData(null);
     }, 1500);
   }, [activeCallId]);
+
+  const toggleMute = useCallback(() => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    webrtcManager.setMuted(nextMuted);
+  }, [isMuted]);
 
   return {
     currentUser,
@@ -161,5 +222,9 @@ export function useVoIPSignaling() {
     acceptIncomingCall,
     rejectIncomingCall,
     endActiveCall,
+    isMuted,
+    toggleMute,
+    webrtcState,
+    remoteStream,
   };
 }

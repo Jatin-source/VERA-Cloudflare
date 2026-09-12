@@ -11,7 +11,9 @@ import {
   ShieldCheck, 
   Mic, 
   MicOff, 
-  Volume2 
+  Volume2,
+  Activity,
+  Wifi
 } from 'lucide-react';
 import { useVoIPSignaling } from '../hooks/useVoIPSignaling';
 
@@ -34,12 +36,14 @@ const CallScreen: React.FC = () => {
     acceptIncomingCall,
     rejectIncomingCall,
     endActiveCall,
+    isMuted,
+    toggleMute,
+    webrtcState,
   } = useVoIPSignaling();
 
   const [targetUser, setTargetUser] = useState('');
   const [isEditingUser, setIsEditingUser] = useState(false);
   const [newUserId, setNewUserId] = useState('');
-  const [isMuted, setIsMuted] = useState(false);
 
   const handleSwitchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -228,8 +232,15 @@ const CallScreen: React.FC = () => {
       {/* CONNECTED IN-CALL STATE */}
       {callState === 'CONNECTED' && (
         <div className="bg-[#0a101d] border border-emerald-500/40 p-8 md:p-10 rounded-3xl shadow-[0_0_40px_rgba(16,185,129,0.15)] max-w-md mx-auto text-center space-y-6">
-          <div className="w-24 h-24 rounded-full bg-[#102026] border-2 border-emerald-500 flex items-center justify-center text-emerald-400 mx-auto shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-            <User size={44} />
+          <div className="relative w-24 h-24 mx-auto">
+            <div className="w-24 h-24 rounded-full bg-[#102026] border-2 border-emerald-500 flex items-center justify-center text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+              <User size={44} />
+            </div>
+            {webrtcState === 'connected' && (
+              <span className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-emerald-500 border-2 border-[#0a101d] flex items-center justify-center text-white" title="WebRTC Active">
+                <Wifi size={12} />
+              </span>
+            )}
           </div>
 
           <div>
@@ -239,27 +250,35 @@ const CallScreen: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-3 bg-[#0d1627] border border-[#1a2333] rounded-2xl flex items-center justify-center space-x-2 text-xs text-blue-400">
-            <ShieldCheck size={16} />
-            <span>Milestone 1 Signaling Active • Peer Connected</span>
+          {/* WebRTC Live Status Badge */}
+          <div className="p-3 bg-[#0d1627] border border-[#1a2333] rounded-2xl space-y-1 text-xs">
+            <div className="flex items-center justify-center space-x-2 text-blue-400 font-medium">
+              <ShieldCheck size={16} />
+              <span>Two-Way VoIP Call • WebRTC Audio</span>
+            </div>
+            <div className="flex items-center justify-center space-x-1.5 text-[11px] text-gray-400 font-mono">
+              <Activity size={12} className={webrtcState === 'connected' ? 'text-emerald-400' : 'text-amber-400 animate-pulse'} />
+              <span>P2P Media: <strong className={webrtcState === 'connected' ? 'text-emerald-400' : 'text-amber-400'}>{webrtcState.toUpperCase()}</strong></span>
+            </div>
           </div>
 
           {/* Call Controls */}
           <div className="flex items-center justify-center space-x-4 pt-2">
             <button
-              onClick={() => setIsMuted(!isMuted)}
+              onClick={toggleMute}
               className={`p-4 rounded-2xl border transition-all ${
                 isMuted
-                  ? 'bg-amber-600/20 border-amber-500 text-amber-400'
+                  ? 'bg-amber-600/20 border-amber-500 text-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
                   : 'bg-[#121d30] border-[#1a2333] text-gray-300 hover:text-white'
               }`}
+              title={isMuted ? 'Unmute Mic' : 'Mute Mic'}
             >
-              {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
+              {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
             </button>
 
             <button
               onClick={endActiveCall}
-              className="p-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl shadow-lg shadow-rose-600/30 transition-all"
+              className="p-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl shadow-lg shadow-rose-600/30 transition-all hover:scale-105 active:scale-95"
               title="End Call"
             >
               <PhoneOff size={24} />
@@ -267,9 +286,9 @@ const CallScreen: React.FC = () => {
 
             <button
               className="p-4 bg-[#121d30] border border-[#1a2333] text-gray-300 hover:text-white rounded-2xl transition-all"
-              title="Speaker"
+              title="Speaker Audio"
             >
-              <Volume2 size={20} />
+              <Volume2 size={22} />
             </button>
           </div>
         </div>
@@ -298,7 +317,7 @@ const CallScreen: React.FC = () => {
 
             <div>
               <p className="text-xs text-blue-400 font-medium tracking-wide uppercase">
-                Incoming Call
+                Incoming VoIP Call
               </p>
               <h3 className="text-2xl font-bold text-white mt-1">
                 {incomingCallData.caller_id}
@@ -308,14 +327,14 @@ const CallScreen: React.FC = () => {
             <div className="flex items-center justify-center space-x-6 pt-2">
               <button
                 onClick={() => rejectIncomingCall('declined')}
-                className="w-14 h-14 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-all"
+                className="w-14 h-14 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-all hover:scale-105"
                 title="Decline"
               >
                 <PhoneOff size={24} />
               </button>
               <button
                 onClick={acceptIncomingCall}
-                className="w-14 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 transition-all"
+                className="w-14 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 transition-all hover:scale-105"
                 title="Accept"
               >
                 <Phone size={24} />

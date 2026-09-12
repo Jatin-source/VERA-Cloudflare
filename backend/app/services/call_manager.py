@@ -156,6 +156,9 @@ class CallManager:
 
         # Milestone 2 WebRTC Signaling passthrough:
         elif msg_type in ["webrtc:offer", "webrtc:answer", "webrtc:ice"]:
+            if not target_id and call_id in self.active_calls:
+                call = self.active_calls[call_id]
+                target_id = call.callee_id if call.caller_id == user_id else call.caller_id
             if target_id:
                 data["sender_id"] = user_id
                 await self.send_to_user(target_id, data)
