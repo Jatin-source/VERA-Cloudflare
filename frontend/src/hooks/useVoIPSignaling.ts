@@ -26,6 +26,8 @@ export function useVoIPSignaling() {
   const [veraSessionId, setVeraSessionId] = useState<string | null>(null);
   const [veraTelemetry, setVeraTelemetry] = useState<VeraTelemetry | null>(null);
   const [isAiConnected, setIsAiConnected] = useState<boolean>(false);
+  const [fullTranscript, setFullTranscript] = useState<string>('');
+  const [detectedSignals, setDetectedSignals] = useState<Array<any>>([]);
 
   const timerRef = useRef<any>(null);
 
@@ -51,7 +53,7 @@ export function useVoIPSignaling() {
     };
   }, []);
 
-  // Milestone 3, 4, 5: Audio Tap, Downsampling, and VERA AI Pipeline
+  // Milestone 3, 4, 5, 6: Audio Tap, Downsampling, and VERA AI Pipeline
   useEffect(() => {
     if (callState === 'CONNECTED' && remoteStream) {
       console.log('[VoIP] Engaging VERA remote audio tap for incoming stream');
@@ -59,9 +61,11 @@ export function useVoIPSignaling() {
       setIsAudioTapActive(true);
       setChunksProcessedCount(0);
       setLastChunk(null);
+      setFullTranscript('');
+      setDetectedSignals([]);
       audioChunkAccumulator.reset();
 
-      // Milestone 5: Connect VERA AI Analysis Session (completely isolated failure domain)
+      // Connect VERA AI Analysis Session (isolated failure domain)
       veraPipeline.startSession(peerId || 'remote_peer').then((sessionId) => {
         if (sessionId) {
           setVeraSessionId(sessionId);
@@ -85,23 +89,36 @@ export function useVoIPSignaling() {
   // Hook Audio Tap frames into Downsampler, Chunker, and VERA AI Pipeline
   useEffect(() => {
     const unsubFrames = remoteAudioTap.onFrame((frameData, sampleRate) => {
-      // Downsample decoded WebRTC audio to 16kHz 16-bit mono PCM
       const pcm16 = downsampleTo16k(frameData, sampleRate);
-      // Feed into 1.0s chunk accumulator
       audioChunkAccumulator.feed(pcm16);
     });
 
     const unsubChunks = audioChunkAccumulator.onChunk((chunk) => {
       setChunksProcessedCount((c) => c + 1);
       setLastChunk(chunk);
-
-      // Milestone 5: Stream chunk to VERA AI WebSocket
       veraPipeline.sendChunk(chunk.index, chunk.wavBuffer);
     });
 
     const unsubTelemetry = veraPipeline.onTelemetry((telemetry) => {
       setVeraTelemetry(telemetry);
       setIsAiConnected(true);
+
+      // Accumulate transcript from Whisper
+      if (telemetry.transcript && typeof telemetry.transcript === 'string') {
+        const clean = telemetry.transcript.trim();
+        if (clean && clean !== '???' && clean !== '...') {
+          setFullTranscript((prev) => {
+            if (!prev) return clean;
+            if (prev.endsWith(clean)) return prev;
+            return `${prev} ${clean}`;
+          });
+        }
+      }
+
+      // Track contributing signals
+      if (telemetry.signals && Array.isArray(telemetry.signals)) {
+        setDetectedSignals(telemetry.signals);
+      }
     });
 
     return () => {
@@ -162,7 +179,6 @@ export function useVoIPSignaling() {
             setActiveCallId(msg.call_id);
             setPeerId(msg.caller_id);
             setCallState('INCOMING_RINGING');
-            // Send back ringing acknowledgment
             signalingService.sendRinging(msg.caller_id, msg.call_id);
           }
           break;
@@ -176,7 +192,6 @@ export function useVoIPSignaling() {
         case 'call:accept':
           if (msg.call_id && peerId) {
             setCallState('CONNECTED');
-            // Caller starts WebRTC media
             try {
               await webrtcManager.startAsCaller(peerId, msg.call_id);
             } catch (err) {
@@ -253,7 +268,6 @@ export function useVoIPSignaling() {
       setCallState('CONNECTED');
       signalingService.sendAccept(incomingCallData.caller_id, incomingCallData.call_id);
       
-      // Callee starts WebRTC media
       try {
         await webrtcManager.startAsCallee(incomingCallData.caller_id, incomingCallData.call_id);
       } catch (err) {
@@ -325,5 +339,7 @@ export function useVoIPSignaling() {
     veraSessionId,
     veraTelemetry,
     isAiConnected,
+    fullTranscript,
+    detectedSignals,
   };
 }
