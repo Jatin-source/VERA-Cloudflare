@@ -15,8 +15,9 @@ import {
   Activity,
   Wifi,
   RadioTower,
-  Cpu,
-  Layers
+    Layers,
+  BrainCircuit,
+  Lock
 } from 'lucide-react';
 import { useVoIPSignaling } from '../hooks/useVoIPSignaling';
 
@@ -45,6 +46,8 @@ const CallScreen: React.FC = () => {
     isAudioTapActive,
     remoteAudioLevel,
     chunksProcessedCount,
+    veraSessionId,
+    isAiConnected,
   } = useVoIPSignaling();
 
   const [targetUser, setTargetUser] = useState('');
@@ -268,20 +271,20 @@ const CallScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Milestone 3 & 4: VERA Audio Tap & 16kHz PCM Chunker Telemetry */}
+          {/* Milestone 3, 4, 5: VERA Audio Tap & AI Pipeline Telemetry Card */}
           <div className="p-3.5 bg-[#091120] border border-blue-500/30 rounded-2xl space-y-2.5 text-left shadow-[0_0_20px_rgba(37,99,235,0.1)]">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-xs font-semibold text-white">
                 <RadioTower size={14} className="text-blue-400" />
-                <span>VERA AI Audio Tap & Chunker</span>
+                <span>VERA AI Security Tap</span>
               </div>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono flex items-center gap-1 ${
-                isAudioTapActive 
+                isAiConnected 
                   ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/40' 
-                  : 'bg-gray-800 text-gray-400'
+                  : 'bg-blue-950/80 text-blue-400 border border-blue-500/30'
               }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${isAudioTapActive ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`}></span>
-                {isAudioTapActive ? 'TAP ACTIVE' : 'TAP READY'}
+                <span className={`w-1.5 h-1.5 rounded-full ${isAiConnected ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400'}`}></span>
+                {isAiConnected ? 'AI STREAMING' : (isAudioTapActive ? 'TAP ACTIVE' : 'TAP READY')}
               </span>
             </div>
 
@@ -299,20 +302,30 @@ const CallScreen: React.FC = () => {
               </div>
             </div>
 
-            {/* Milestone 4: PCM Downsampling Telemetry */}
-            <div className="pt-1 border-t border-[#1a2333] flex items-center justify-between text-[11px] font-mono text-gray-300">
+            {/* Milestone 5: Pipeline WebSocket Telemetry */}
+            <div className="pt-1.5 border-t border-[#1a2333] flex items-center justify-between text-[11px] font-mono text-gray-300">
+              <div className="flex items-center space-x-1.5">
+                <BrainCircuit size={13} className="text-purple-400" />
+                <span>AI WebSocket:</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-purple-950/80 border border-purple-500/30 text-purple-300 font-mono">
+                {veraSessionId ? `Session #${veraSessionId.slice(0, 8)}...` : 'Connecting...'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] font-mono text-gray-300">
               <div className="flex items-center space-x-1.5">
                 <Layers size={13} className="text-blue-400" />
                 <span>16kHz Chunks:</span>
               </div>
               <span className="px-2 py-0.5 rounded bg-blue-950/80 border border-blue-500/30 text-blue-400 font-bold">
-                {chunksProcessedCount} Ready (1.0s)
+                {chunksProcessedCount} Processed
               </span>
             </div>
 
-            <p className="text-[10px] text-gray-500 flex items-center gap-1">
-              <Cpu size={11} className="text-blue-400 shrink-0" />
-              <span>Downsampled to 16,000Hz 16-bit PCM • Ready for AI</span>
+            <p className="text-[10px] text-gray-500 flex items-center gap-1 pt-0.5">
+              <Lock size={11} className="text-emerald-400 shrink-0" />
+              <span>Isolated failure domain • Media stream 100% resilient</span>
             </p>
           </div>
 

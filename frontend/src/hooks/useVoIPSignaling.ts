@@ -3,6 +3,7 @@ import { signalingService } from '../services/signaling';
 import { webrtcManager } from '../services/webrtc';
 import { remoteAudioTap } from '../services/audioTap';
 import { downsampleTo16k, audioChunkAccumulator, type AudioChunk } from '../services/audioConverter';
+import { veraPipeline, type VeraTelemetry } from '../services/veraPipeline';
 import type { CallState, SignalingMessage } from '../types/voip';
 
 export function useVoIPSignaling() {
@@ -22,6 +23,9 @@ export function useVoIPSignaling() {
   const [remoteAudioLevel, setRemoteAudioLevel] = useState<number>(0);
   const [chunksProcessedCount, setChunksProcessedCount] = useState<number>(0);
   const [lastChunk, setLastChunk] = useState<AudioChunk | null>(null);
+  const [veraSessionId, setVeraSessionId] = useState<string | null>(null);
+  const [veraTelemetry, setVeraTelemetry] = useState<VeraTelemetry | null>(null);
+  const [isAiConnected, setIsAiConnected] = useState<boolean>(false);
 
   const timerRef = useRef<any>(null);
 
@@ -47,7 +51,7 @@ export function useVoIPSignaling() {
     };
   }, []);
 
-  // Milestone 3 & 4: Audio Tap & Downsampling Pipeline
+  // Milestone 3, 4, 5: Audio Tap, Downsampling, and VERA AI Pipeline
   useEffect(() => {
     if (callState === 'CONNECTED' && remoteStream) {
       console.log('[VoIP] Engaging VERA remote audio tap for incoming stream');
@@ -56,17 +60,29 @@ export function useVoIPSignaling() {
       setChunksProcessedCount(0);
       setLastChunk(null);
       audioChunkAccumulator.reset();
+
+      // Milestone 5: Connect VERA AI Analysis Session (completely isolated failure domain)
+      veraPipeline.startSession(peerId || 'remote_peer').then((sessionId) => {
+        if (sessionId) {
+          setVeraSessionId(sessionId);
+          setIsAiConnected(true);
+        }
+      });
     } else {
       if (remoteAudioTap.getIsActive()) {
-        console.log('[VoIP] Stopping VERA remote audio tap and flushing chunk buffer');
+        console.log('[VoIP] Stopping VERA audio tap, chunk buffer, and AI session');
         remoteAudioTap.stop();
         audioChunkAccumulator.flush();
+        veraPipeline.stopSession();
         setIsAudioTapActive(false);
+        setIsAiConnected(false);
+        setVeraSessionId(null);
+        setVeraTelemetry(null);
       }
     }
-  }, [callState, remoteStream]);
+  }, [callState, remoteStream, peerId]);
 
-  // Hook Audio Tap frames directly into the 16kHz Downsampler & Chunker
+  // Hook Audio Tap frames into Downsampler, Chunker, and VERA AI Pipeline
   useEffect(() => {
     const unsubFrames = remoteAudioTap.onFrame((frameData, sampleRate) => {
       // Downsample decoded WebRTC audio to 16kHz 16-bit mono PCM
@@ -78,11 +94,20 @@ export function useVoIPSignaling() {
     const unsubChunks = audioChunkAccumulator.onChunk((chunk) => {
       setChunksProcessedCount((c) => c + 1);
       setLastChunk(chunk);
+
+      // Milestone 5: Stream chunk to VERA AI WebSocket
+      veraPipeline.sendChunk(chunk.index, chunk.wavBuffer);
+    });
+
+    const unsubTelemetry = veraPipeline.onTelemetry((telemetry) => {
+      setVeraTelemetry(telemetry);
+      setIsAiConnected(true);
     });
 
     return () => {
       unsubFrames();
       unsubChunks();
+      unsubTelemetry();
     };
   }, []);
 
@@ -164,6 +189,7 @@ export function useVoIPSignaling() {
           setCallState('ENDED');
           remoteAudioTap.stop();
           audioChunkAccumulator.flush();
+          veraPipeline.stopSession();
           webrtcManager.cleanup();
           setTimeout(() => {
             setCallState('IDLE');
@@ -177,6 +203,7 @@ export function useVoIPSignaling() {
           setCallState('ENDED');
           remoteAudioTap.stop();
           audioChunkAccumulator.flush();
+          veraPipeline.stopSession();
           webrtcManager.cleanup();
           setTimeout(() => {
             setCallState('IDLE');
@@ -242,6 +269,7 @@ export function useVoIPSignaling() {
       signalingService.sendReject(incomingCallData.caller_id, incomingCallData.call_id, reason);
       remoteAudioTap.stop();
       audioChunkAccumulator.flush();
+      veraPipeline.stopSession();
       webrtcManager.cleanup();
       setCallState('IDLE');
       setActiveCallId(null);
@@ -256,6 +284,7 @@ export function useVoIPSignaling() {
     }
     remoteAudioTap.stop();
     audioChunkAccumulator.flush();
+    veraPipeline.stopSession();
     webrtcManager.cleanup();
     setCallState('ENDED');
     setTimeout(() => {
@@ -293,5 +322,8 @@ export function useVoIPSignaling() {
     remoteAudioLevel,
     chunksProcessedCount,
     lastChunk,
+    veraSessionId,
+    veraTelemetry,
+    isAiConnected,
   };
 }
