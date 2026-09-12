@@ -60,7 +60,7 @@ function mergeTranscripts(existing: string, incoming: string): string {
   return ex + ' ' + inc;
 }
 
-const WS_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/^http/, 'ws');
+const WS_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8010').replace(/^http/, 'ws');
 
 function floatTo16BitPCM(input: Float32Array): Int16Array {
   const output = new Int16Array(input.length);

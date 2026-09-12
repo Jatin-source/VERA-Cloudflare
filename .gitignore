@@ -1,6 +1,4 @@
-# Byte-compiled / optimized / DLL files
 __pycache__/
-<<<<<<< HEAD
 *.py[cod]
 *$py.class
 
@@ -18,11 +16,13 @@ data/pretrained_models/
 *.onnx
 *.ckpt
 
+# Databases
+data/*.db
+data/vera.db
+*.sqlite3
+
 # Cached embeddings
 data/enrolled_speakers/*.npy
-=======
-*.py[codz]
-*$py.class
 
 # C extensions
 *.so
@@ -237,4 +237,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
->>>>>>> origin/main
