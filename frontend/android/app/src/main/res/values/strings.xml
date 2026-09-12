@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">VERA</string>
+    <string name="title_activity_main">VERA</string>
+    <string name="package_name">com.vera.voiceauth</string>
+    <string name="custom_url_scheme">com.vera.voiceauth</string>
+</resources>

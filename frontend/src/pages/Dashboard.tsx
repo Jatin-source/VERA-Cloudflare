@@ -267,40 +267,41 @@ const Dashboard: React.FC = () => {
     <div className="flex flex-col h-full bg-[#070b14] text-gray-200">
       
       {/* Top Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-[#1a2333] bg-[#0a101d]">
-        <div className="flex items-center space-x-4">
-          <div className="bg-blue-600 p-2 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.5)]">
-            <ShieldCheck className="w-5 h-5 text-white" />
+      <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 border-b border-[#1a2333] bg-[#0a101d]">
+        <div className="flex items-center space-x-3 w-full sm:w-auto justify-between sm:justify-start">
+          <div className="flex items-center space-x-3">
+            <div className="bg-blue-600 p-2 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+              <ShieldCheck className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold tracking-wide text-white">VERA</h1>
+              <p className="text-[9px] sm:text-[10px] text-gray-400 uppercase tracking-widest">Voice Evidence & Risk Auth</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-wide text-white">VERA</h1>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest">Voice Evidence & Risk Authentication</p>
-          </div>
-          <div className="hidden md:flex items-center space-x-2 ml-4">
-            <span className="px-2 py-0.5 bg-[#121d30] text-blue-400 text-[10px] font-mono rounded border border-blue-900">v2.0</span>
-            <span className="px-2 py-0.5 bg-blue-900/30 text-blue-400 text-[10px] font-mono rounded border border-blue-800/50">SIH 2026</span>
+          <div className="flex sm:hidden items-center px-2.5 py-1 bg-[#0d1627] rounded-lg border border-[#1a2333]">
+            <Radio className={`w-3.5 h-3.5 mr-1.5 ${connectionState === 'Live' ? 'text-blue-500 animate-pulse' : 'text-gray-500'}`} />
+            <span className="text-[11px] font-semibold">{connectionState}</span>
           </div>
         </div>
         
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center px-3 py-1.5 bg-[#0d1627] rounded-lg border border-[#1a2333]">
+        <div className="flex items-center space-x-2 sm:space-x-4 w-full sm:w-auto overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
+          <div className="flex items-center px-2.5 sm:px-3 py-1 sm:py-1.5 bg-[#0d1627] rounded-lg border border-[#1a2333] shrink-0">
             <div className="w-2 h-2 rounded-full bg-emerald-500 mr-2 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
             <div className="flex flex-col">
-              <span className="text-xs font-semibold text-emerald-400">System Online</span>
-              <span className="text-[9px] text-gray-500">Backend Connected</span>
+              <span className="text-[11px] sm:text-xs font-semibold text-emerald-400">System Online</span>
+              <span className="text-[8px] sm:text-[9px] text-gray-500">Port 8010</span>
             </div>
           </div>
           
-          <div className="flex items-center px-3 py-1.5 bg-[#0d1627] rounded-lg border border-[#1a2333]">
-            <ShieldAlert className="w-4 h-4 text-gray-400 mr-2" />
+          <div className="flex items-center px-2.5 sm:px-3 py-1 sm:py-1.5 bg-[#0d1627] rounded-lg border border-[#1a2333] shrink-0">
+            <ShieldAlert className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-gray-400 mr-1.5 sm:mr-2" />
             <div className="flex flex-col">
-              <span className="text-[9px] text-gray-500 uppercase">Session ID</span>
-              <span className="text-xs font-mono text-gray-300">{activeSession ? activeSession.session_id.split('-')[0] + '...' : 'NONE'}</span>
+              <span className="text-[8px] sm:text-[9px] text-gray-500 uppercase">Session</span>
+              <span className="text-[11px] sm:text-xs font-mono text-gray-300">{activeSession ? activeSession.session_id.split('-')[0] + '...' : 'NONE'}</span>
             </div>
-            <FileText className="w-3 h-3 text-gray-500 ml-3 cursor-pointer hover:text-gray-300" />
           </div>
           
-          <div className="flex items-center px-4 py-2 bg-[#0d1627] rounded-lg border border-[#1a2333]">
+          <div className="hidden sm:flex items-center px-4 py-2 bg-[#0d1627] rounded-lg border border-[#1a2333] shrink-0">
             <Radio className={`w-4 h-4 mr-2 ${connectionState === 'Live' ? 'text-blue-500 animate-pulse' : 'text-gray-500'}`} />
             <span className="text-xs font-semibold">{connectionState}</span>
           </div>
@@ -308,21 +309,21 @@ const Dashboard: React.FC = () => {
       </header>
 
       {/* Main Content Area */}
-      <div className="p-6 overflow-y-auto flex-1">
+      <div className="p-4 sm:p-6 overflow-y-auto flex-1">
         
         {/* Welcome & Controls */}
-        <div className="flex items-end justify-between mb-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4 sm:mb-6">
           <div>
-            <h2 className="text-2xl font-semibold text-white mb-1">Welcome back, Akhil</h2>
-            <p className="text-sm text-gray-400">Real-time voice analysis for a safer digital world.</p>
+            <h2 className="text-xl sm:text-2xl font-semibold text-white mb-1">Live Voice Guardian</h2>
+            <p className="text-xs sm:text-sm text-gray-400">Real-time voice analysis for scam & deepfake protection.</p>
           </div>
           
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full md:w-auto">
             {!activeSession ? (
               <button 
                 onClick={handleStartSession}
                 disabled={isInitializing}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all flex items-center"
+                className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all flex items-center justify-center active:scale-95"
               >
                 {isInitializing ? <Loader2 size={16} className="animate-spin mr-2" /> : <ShieldCheck size={16} className="mr-2" />}
                 Initialize Session
@@ -331,16 +332,16 @@ const Dashboard: React.FC = () => {
               <>
                 <button
                   onClick={connectionState === 'Disconnected' ? () => { setDetectionMode('Live'); activeSession && startLiveDetection(activeSession.session_id); } : stopLiveDetection}
-                  className={`px-6 py-2 ${connectionState === 'Disconnected' ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'bg-red-600/20 text-red-500 border border-red-900/50 hover:bg-red-600/30'} text-sm font-semibold rounded-lg transition-all flex items-center`}
+                  className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 ${connectionState === 'Disconnected' ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]' : 'bg-red-600/20 text-red-500 border border-red-900/50 hover:bg-red-600/30'} text-xs sm:text-sm font-semibold rounded-xl transition-all flex items-center justify-center active:scale-95`}
                 >
                   {connectionState === 'Disconnected' ? (
                     <><Mic size={16} className="mr-2" /> Start Live Mic</>
                   ) : (
-                    <><div className="w-2 h-2 rounded-full bg-red-500 mr-2 animate-pulse" /> Stop</>
+                    <><div className="w-2.5 h-2.5 rounded-full bg-red-500 mr-2 animate-pulse" /> Stop Mic</>
                   )}
                 </button>
                 
-                <label className="px-6 py-2 bg-[#121d30] border border-[#1a2333] hover:bg-[#1a2333] text-gray-300 text-sm font-semibold rounded-lg transition-all flex items-center cursor-pointer">
+                <label className="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 bg-[#121d30] border border-[#1a2333] hover:bg-[#1a2333] text-gray-300 text-xs sm:text-sm font-semibold rounded-xl transition-all flex items-center justify-center cursor-pointer active:scale-95">
                   <FileAudio size={16} className="mr-2" />
                   Upload WAV
                   <input 
