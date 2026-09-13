@@ -22,10 +22,7 @@ export interface SignalingMessage {
     | 'users:list'
     | 'webrtc:offer'
     | 'webrtc:answer'
-    | 'webrtc:ice'
-    | 'identity:challenge'
-    | 'identity:response'
-    | 'guardian:alert';
+    | 'webrtc:ice';
   call_id?: string;
   caller_id?: string;
   callee_id?: string;
@@ -36,10 +33,4 @@ export interface SignalingMessage {
   candidate?: any;
   users?: string[];
   timestamp?: string;
-  claimed_entity?: string;
-  claimed_role?: string;
-  challenge_id?: string;
-  status?: 'APPROVED' | 'FAILED' | 'REJECTED';
-  auth_code?: string;
-  risk_level?: string;
 }

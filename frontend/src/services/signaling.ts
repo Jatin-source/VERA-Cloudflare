@@ -193,38 +193,6 @@ class SignalingService {
     });
   }
 
-  public sendIdentityChallenge(targetId: string, callId: string, claimedEntity: string, claimedRole?: string, challengeId?: string) {
-    this.send({
-      type: 'identity:challenge',
-      target_id: targetId,
-      call_id: callId,
-      claimed_entity: claimedEntity,
-      claimed_role: claimedRole,
-      challenge_id: challengeId || `CHAL-${Math.floor(1000 + Math.random() * 9000)}`
-    });
-  }
-
-  public sendIdentityResponse(targetId: string, callId: string, challengeId: string, status: 'APPROVED' | 'FAILED' | 'REJECTED', authCode?: string) {
-    this.send({
-      type: 'identity:response',
-      target_id: targetId,
-      call_id: callId,
-      challenge_id: challengeId,
-      status,
-      auth_code: authCode
-    });
-  }
-
-  public sendGuardianAlert(targetId: string, claimedEntity: string, riskLevel: string, callId?: string) {
-    this.send({
-      type: 'guardian:alert',
-      target_id: targetId,
-      call_id: callId,
-      claimed_entity: claimedEntity,
-      risk_level: riskLevel
-    });
-  }
-
   public async getIceConfig(): Promise<{ iceServers: IceServerConfig[] }> {
     const baseUrl = getBaseUrl();
     try {

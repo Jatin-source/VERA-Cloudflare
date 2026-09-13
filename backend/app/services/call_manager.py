@@ -166,14 +166,4 @@ class CallManager:
                 data["sender_id"] = user_id
                 await self.send_to_user(target_id, data)
 
-        # Milestone 18: Out-of-Band Identity Verification & Guardian Alerts Passthrough:
-        elif msg_type in ["identity:challenge", "identity:response", "guardian:alert"]:
-            if not target_id and call_id in self.active_calls:
-                call = self.active_calls[call_id]
-                target_id = call.callee_id if call.caller_id == user_id else call.caller_id
-            if target_id:
-                data["sender_id"] = user_id
-                logger.info(f"[Signaling] Relaying {msg_type} from {user_id} to {target_id}")
-                await self.send_to_user(target_id, data)
-
 call_manager = CallManager()
