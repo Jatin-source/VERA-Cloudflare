@@ -56,15 +56,28 @@ export interface EvidenceResponse {
   };
 }
 
-export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://faq-coordinator-cosmetic-screensaver.trycloudflare.com';
+export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://citations-knock-exercises-garden.trycloudflare.com';
 
 export function getBaseUrl(): string {
   try {
     const saved = localStorage.getItem('vera_server_url');
-    if (saved && saved.trim()) {
+    if (saved && saved.trim() && !saved.includes('faq-coordinator-cosmetic-screensaver') && !saved.includes('necessity-anime-communities-well')) {
       return saved.trim().replace(/\/+$/, '');
     }
   } catch {}
+
+  // If accessing via browser on local development port 5173, connect directly to local backend
+  if (typeof window !== 'undefined' && window.location) {
+    const port = window.location.port;
+    const hostname = window.location.hostname;
+    if (port === '5173') {
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:8010';
+      }
+      return `http://${hostname}:8010`;
+    }
+  }
+
   return DEFAULT_BASE_URL.replace(/\/+$/, '');
 }
 
