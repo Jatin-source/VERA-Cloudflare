@@ -56,12 +56,12 @@ export interface EvidenceResponse {
   };
 }
 
-export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://citations-knock-exercises-garden.trycloudflare.com';
+export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://noon-paintings-api-understand.trycloudflare.com';
 
 export function getBaseUrl(): string {
   try {
     const saved = localStorage.getItem('vera_server_url');
-    if (saved && saved.trim() && !saved.includes('faq-coordinator-cosmetic-screensaver') && !saved.includes('necessity-anime-communities-well')) {
+    if (saved && saved.trim() && !saved.includes('trycloudflare.com')) {
       return saved.trim().replace(/\/+$/, '');
     }
   } catch {}
