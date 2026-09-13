@@ -487,13 +487,13 @@ const CallScreen: React.FC = () => {
       {/* CONNECTED IN-CALL STATE (iOS INTERFACE - FITTED NON-SCROLLABLE) */}
       {callState === 'CONNECTED' && viewMode === 'ios' && (
         <div className="fixed inset-0 z-50 bg-[#070B14] flex items-center justify-center overflow-hidden select-none">
-          {/* Floating Switcher in Top Right */}
-          <div className="absolute top-3 right-3 z-[80]">
+          {/* Non-overlapping Switcher: Top-Right on Desktop, Bottom-Right on Mobile */}
+          <div className="fixed bottom-3 right-3 md:top-4 md:right-5 md:bottom-auto z-[90]">
             <button
               onClick={() => setViewMode('cyber')}
-              className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#0d1627]/90 hover:bg-[#121d30] border border-blue-500/40 text-blue-400 hover:text-white shadow-xl flex items-center gap-1.5 backdrop-blur-md transition-all"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold bg-[#0d1627]/95 hover:bg-[#121d30] border border-blue-500/40 text-blue-300 hover:text-white shadow-2xl flex items-center gap-1.5 backdrop-blur-md transition-all active:scale-95"
             >
-              <span>🛡️ Switch to Cyber Telemetry</span>
+              <span>🛡️ Telemetry View</span>
             </button>
           </div>
           <IOSCallScreen
@@ -1057,12 +1057,13 @@ const CallScreen: React.FC = () => {
         const rep = incomingCallData.reputation || callerReputation;
         return (
           <div className="fixed inset-0 bg-[#070B14] z-50 flex items-center justify-center overflow-hidden select-none">
-            <div className="absolute top-3 right-3 z-[80]">
+            {/* Non-overlapping Switcher: Top-Right on Desktop, Bottom-Right on Mobile */}
+            <div className="fixed bottom-3 right-3 md:top-4 md:right-5 md:bottom-auto z-[90]">
               <button
                 onClick={() => setViewMode('cyber')}
-                className="text-[11px] bg-[#0d1627]/90 hover:bg-[#121d30] text-gray-300 hover:text-white px-3.5 py-1.5 rounded-full border border-white/20 font-mono shadow-xl transition-all"
+                className="text-[11px] bg-[#0d1627]/95 hover:bg-[#121d30] text-gray-200 hover:text-white px-3 py-1.5 rounded-full border border-white/20 font-mono shadow-2xl transition-all active:scale-95"
               >
-                Switch to Cyber Alert 🛡️
+                Cyber Alert 🛡️
               </button>
             </div>
             <IOSCallScreen
@@ -1456,10 +1457,10 @@ const CallScreen: React.FC = () => {
       {/* INTERACTIVE iOS CALL SIMULATION OVERLAY (FITTED NON-SCROLLABLE) */}
       {simulatedCallState !== 'none' && (
         <div className="fixed inset-0 bg-[#070B14] z-[100] flex items-center justify-center overflow-hidden select-none">
-          {/* Floating Simulation Control Pill */}
-          <div className="absolute top-3 right-3 z-[80] flex items-center gap-2 bg-[#0d1627]/90 backdrop-blur-md border border-[#1a2333] px-3 py-1.5 rounded-full text-xs text-white shadow-2xl">
+          {/* Non-overlapping Simulation Control: Top-Left on Desktop, Bottom-Left on Mobile */}
+          <div className="fixed bottom-3 left-3 md:top-4 md:left-5 md:bottom-auto z-[90] flex items-center gap-2 bg-[#0d1627]/95 backdrop-blur-md border border-[#1a2333] px-3 py-1.5 rounded-full text-xs text-white shadow-2xl">
             <span className="font-bold text-amber-400 flex items-center gap-1">
-              <span>⚡ Simulation:</span>
+              <span>⚡ Sim:</span>
             </span>
             <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
               <button

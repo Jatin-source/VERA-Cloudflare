@@ -63,8 +63,8 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
   identityClaimText,
   onOpenFullDossier
 }) => {
-  // Start expanded by default on active call or toggleable
-  const [isIslandExpanded, setIsIslandExpanded] = useState(true);
+  // Initially hidden / collapsed as requested: click the top pill to open
+  const [isIslandExpanded, setIsIslandExpanded] = useState(false);
   const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
 
   // Derive display values
@@ -90,136 +90,148 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
       <div className="w-full max-w-[390px] h-[100dvh] md:h-[min(760px,calc(100vh-16px))] bg-[#F5F7FA] md:rounded-[44px] md:border-[7px] md:border-[#1E293B] shadow-[0_20px_60px_rgba(0,0,0,0.85)] relative overflow-hidden flex flex-col justify-between select-none">
         
         {/* =========================================================================
-            LAYER 1: TOP STATUS BAR & DYNAMIC ISLAND CONTAINER (STRICT Z-INDEX z-[60])
+            LAYER 1: TOP STATUS BAR & LOWERED DYNAMIC ISLAND (NEVER OVERLAPS SYSTEM)
             ========================================================================= */}
-        <div className="relative z-[60] w-full px-6 pt-3 pb-1 flex justify-between items-center text-slate-800">
-          {/* iOS Clock */}
-          <span className="text-[13px] font-semibold tracking-tight font-sans">9:41</span>
+        <div className="relative z-[60] w-full flex flex-col items-center">
+          {/* iOS System Status Bar: Clock on Left, 5G/Wifi/Battery on Right */}
+          <div className="w-full px-7 pt-3 pb-1 flex justify-between items-center text-slate-800 text-xs select-none">
+            {/* iOS Clock */}
+            <span className="text-[13px] font-semibold tracking-tight font-sans">9:41</span>
 
-          {/* DYNAMIC ISLAND / VERA SECURITY MONITOR COMPONENT (TOP CENTRE & CLICKABLE) */}
-          <div 
-            className={`absolute left-1/2 -translate-x-1/2 top-2 z-50 transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] ${
-              isIslandExpanded 
-                ? 'w-[92%] max-w-[350px] p-3 sm:p-3.5 bg-[#0a101d] border border-[#1a2333] rounded-[2rem] shadow-[0_15px_40px_rgba(0,0,0,0.7)]' 
-                : `w-[124px] h-8 bg-black rounded-full flex items-center justify-center cursor-pointer shadow-md hover:scale-105 active:scale-95 ${
-                    isHighThreat ? 'ring-2 ring-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : ''
-                  }`
-            }`}
-            onClick={() => {
-              if (!isIslandExpanded) setIsIslandExpanded(true);
-            }}
-          >
-            {/* COLLAPSED STATE (Click to expand) */}
-            {!isIslandExpanded ? (
-              <div className="flex items-center space-x-3 px-3 w-full justify-between">
-                {/* Left Indicator Dot */}
-                <span className={`w-2.5 h-2.5 rounded-full ${isHighThreat ? 'bg-red-500 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
-                {/* Center Audio Waveform Bar */}
-                <div className="flex items-center space-x-0.5">
-                  <span className="w-0.5 h-2 bg-slate-500 rounded-full animate-pulse" />
-                  <span className="w-0.5 h-3.5 bg-cyan-400 rounded-full" />
-                  <span className="w-0.5 h-2 bg-slate-500 rounded-full animate-pulse" />
-                </div>
-                {/* Right Indicator Dot */}
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
-              </div>
-            ) : (
-              /* EXPANDED STATE (VERA Security Monitor - Click Header to Collapse) */
-              <div className="w-full flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
-                {/* Island Header: Clickable to toggle collapse */}
+            {/* iOS Right Status Icons */}
+            <div className="flex items-center space-x-1.5 text-slate-700">
+              <span className="text-[10px] font-bold tracking-tighter">5G</span>
+              <Wifi size={13} strokeWidth={2.5} />
+              <Battery size={15} strokeWidth={2.5} />
+            </div>
+          </div>
+
+          {/* LOWERED DYNAMIC ISLAND / VERA SECURITY MONITOR COMPONENT (CLICKABLE) */}
+          <div className="w-full flex justify-center px-4 pt-1 pb-1">
+            <div 
+              className={`transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+                isIslandExpanded 
+                  ? 'w-[96%] max-w-[350px] p-3 sm:p-3.5 bg-[#0a101d] border border-[#1a2333] rounded-[2rem] shadow-[0_15px_40px_rgba(0,0,0,0.7)]' 
+                  : `w-[134px] h-8 bg-black rounded-full flex items-center justify-center cursor-pointer shadow-md hover:scale-105 active:scale-95 ${
+                      isHighThreat ? 'ring-2 ring-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : ''
+                    }`
+              }`}
+              onClick={() => {
+                if (!isIslandExpanded) setIsIslandExpanded(true);
+              }}
+            >
+              {/* COLLAPSED STATE (Initially visible, clickable to expand) */}
+              {!isIslandExpanded ? (
                 <div 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsIslandExpanded(false);
-                  }}
-                  className="flex items-center justify-between border-b border-[#1a2333] pb-1.5 cursor-pointer group"
-                  title="Click to minimize Dynamic Island"
+                  className="flex items-center justify-between px-3 w-full cursor-pointer"
+                  title="Click to open VERA Security Monitor"
                 >
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${isHighThreat ? 'bg-red-500 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
-                    <span className="text-[11px] font-bold tracking-wider uppercase text-gray-200 font-mono">
-                      VERA SECURITY MONITOR
-                    </span>
+                  {/* Left Indicator Dot */}
+                  <span className={`w-2.5 h-2.5 rounded-full ${isHighThreat ? 'bg-red-500 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
+                  
+                  {/* Center Audio Waveform Bar & VERA tag */}
+                  <div className="flex items-center space-x-1">
+                    <span className="w-0.5 h-2 bg-slate-500 rounded-full animate-pulse" />
+                    <span className="w-0.5 h-3.5 bg-cyan-400 rounded-full" />
+                    <span className="w-0.5 h-2 bg-slate-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-mono text-gray-300 font-semibold pl-1">VERA</span>
                   </div>
-                  <div className="text-gray-400 group-hover:text-white p-0.5 rounded-full transition-colors">
-                    <ChevronUp size={15} />
-                  </div>
+
+                  {/* Right Indicator Dot */}
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
                 </div>
-
-                {/* Metrics Rows */}
-                <div className="flex flex-col gap-1 text-left">
-                  {/* Row 1: Voice Integrity */}
-                  <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
-                    <span className="text-[12px] text-gray-300 font-medium">Voice Integrity</span>
-                    <div className="flex flex-col items-end leading-tight">
-                      <span className={`text-[10px] font-semibold ${isCloneAttack || aiPercent >= 60 ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {isCloneAttack ? 'CLONE ATTACK' : aiPercent >= 60 ? 'SYNTHETIC RISK' : 'Genuine'}
+              ) : (
+                /* EXPANDED STATE (Click Header or Hide Chevron to Collapse) */
+                <div className="w-full flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                  {/* Island Header: Clickable to toggle collapse */}
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsIslandExpanded(false);
+                    }}
+                    className="flex items-center justify-between border-b border-[#1a2333] pb-1.5 cursor-pointer group"
+                    title="Click to minimize VERA Security Monitor"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${isHighThreat ? 'bg-red-500 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
+                      <span className="text-[11px] font-bold tracking-wider uppercase text-gray-200 font-mono">
+                        VERA SECURITY MONITOR
                       </span>
-                      <span className={`text-[15px] font-bold font-mono ${isCloneAttack || aiPercent >= 60 ? 'text-red-400' : 'text-white'}`}>
-                        {integrityPercent}%
-                      </span>
+                    </div>
+                    <div className="text-gray-400 group-hover:text-white p-0.5 rounded-full transition-colors flex items-center gap-1">
+                      <span className="text-[10px] text-gray-500 uppercase font-mono group-hover:text-gray-300">Hide</span>
+                      <ChevronUp size={15} />
                     </div>
                   </div>
 
-                  {/* Row 2: Overall Risk */}
-                  <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
-                    <span className="text-[12px] text-gray-300 font-medium">Overall Risk</span>
-                    <div className="flex flex-col items-end leading-tight">
-                      <span className={`text-[10px] font-bold font-mono uppercase ${riskPercent >= 70 ? 'text-red-400' : riskPercent >= 40 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                        {riskLevel}
-                      </span>
-                      <span className={`text-[15px] font-bold font-mono ${riskPercent >= 70 ? 'text-red-400' : riskPercent >= 40 ? 'text-amber-400' : 'text-white'}`}>
-                        {riskPercent}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Row 3: Live Location */}
-                  <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
-                    <span className="text-[12px] text-gray-300 font-medium">Live Location</span>
-                    <div className="flex flex-col items-end leading-tight">
-                      <span className="text-[13px] font-semibold text-white truncate max-w-[170px]">
-                        {liveLocationText}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Optional Row 4: Speaker Voiceprint */}
-                  {speakerMatchPercent !== undefined && speakerMatchPercent !== null && (
+                  {/* Metrics Rows */}
+                  <div className="flex flex-col gap-1 text-left">
+                    {/* Row 1: Voice Integrity */}
                     <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
-                      <span className="text-[12px] text-gray-300 font-medium">Speaker Match</span>
+                      <span className="text-[12px] text-gray-300 font-medium">Voice Integrity</span>
                       <div className="flex flex-col items-end leading-tight">
-                        <span className="text-[14px] font-bold font-mono text-cyan-300">
-                          {speakerMatchPercent}%
+                        <span className={`text-[10px] font-semibold ${isCloneAttack || aiPercent >= 60 ? 'text-red-400' : 'text-emerald-400'}`}>
+                          {isCloneAttack ? 'CLONE ATTACK' : aiPercent >= 60 ? 'SYNTHETIC RISK' : 'Genuine'}
+                        </span>
+                        <span className={`text-[15px] font-bold font-mono ${isCloneAttack || aiPercent >= 60 ? 'text-red-400' : 'text-white'}`}>
+                          {integrityPercent}%
                         </span>
                       </div>
                     </div>
-                  )}
+
+                    {/* Row 2: Overall Risk */}
+                    <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
+                      <span className="text-[12px] text-gray-300 font-medium">Overall Risk</span>
+                      <div className="flex flex-col items-end leading-tight">
+                        <span className={`text-[10px] font-bold font-mono uppercase ${riskPercent >= 70 ? 'text-red-400' : riskPercent >= 40 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {riskLevel}
+                        </span>
+                        <span className={`text-[15px] font-bold font-mono ${riskPercent >= 70 ? 'text-red-400' : riskPercent >= 40 ? 'text-amber-400' : 'text-white'}`}>
+                          {riskPercent}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Row 3: Live Location */}
+                    <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
+                      <span className="text-[12px] text-gray-300 font-medium">Live Location</span>
+                      <div className="flex flex-col items-end leading-tight">
+                        <span className="text-[13px] font-semibold text-white truncate max-w-[170px]">
+                          {liveLocationText}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Optional Row 4: Speaker Voiceprint */}
+                    {speakerMatchPercent !== undefined && speakerMatchPercent !== null && (
+                      <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
+                        <span className="text-[12px] text-gray-300 font-medium">Speaker Match</span>
+                        <div className="flex flex-col items-end leading-tight">
+                          <span className="text-[14px] font-bold font-mono text-cyan-300">
+                            {speakerMatchPercent}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Bottom Action Button: View Security Analysis */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onOpenFullDossier) {
+                        onOpenFullDossier();
+                      } else {
+                        setIsDossierModalOpen(true);
+                      }
+                    }}
+                    className="w-full mt-1.5 h-[34px] rounded-[1rem] border border-[#1a2333] bg-[#111928] hover:bg-[#182338] text-blue-400 hover:text-blue-300 text-[11px] font-semibold transition-colors flex items-center justify-center gap-1.5 active:scale-98"
+                  >
+                    <span>VIEW SECURITY ANALYSIS →</span>
+                  </button>
                 </div>
-
-                {/* Bottom Action Button: View Security Analysis */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (onOpenFullDossier) {
-                      onOpenFullDossier();
-                    } else {
-                      setIsDossierModalOpen(true);
-                    }
-                  }}
-                  className="w-full mt-1.5 h-[34px] rounded-[1rem] border border-[#1a2333] bg-[#111928] hover:bg-[#182338] text-blue-400 hover:text-blue-300 text-[11px] font-semibold transition-colors flex items-center justify-center gap-1.5 active:scale-98"
-                >
-                  <span>VIEW SECURITY ANALYSIS →</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* iOS Right Status Icons */}
-          <div className="flex items-center space-x-1.5 text-slate-800">
-            <span className="text-[9px] font-semibold tracking-tighter">5G</span>
-            <Wifi size={13} strokeWidth={2.5} />
-            <Battery size={15} strokeWidth={2.5} />
+              )}
+            </div>
           </div>
         </div>
 
@@ -229,9 +241,9 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
         <div className="relative z-10 flex-1 flex flex-col items-center justify-between px-5 py-2 overflow-hidden w-full">
           
           {/* Top Caller Typography */}
-          <div className="text-center w-full min-h-[38px] flex flex-col justify-center">
+          <div className="text-center w-full min-h-[44px] flex flex-col justify-center">
             {!isIslandExpanded ? (
-              /* Full Typography when island is collapsed */
+              /* Full Typography when island is collapsed / hidden */
               <div className="animate-in fade-in duration-200">
                 <div className="text-slate-500 text-xs font-medium flex items-center justify-center gap-1 mb-1">
                   <Wifi size={12} className="text-slate-400" />
@@ -257,7 +269,7 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
               </div>
             ) : (
               /* Compact Caller Chip when island is expanded */
-              <div className="pt-1 animate-in fade-in duration-200">
+              <div className="pt-0.5 animate-in fade-in duration-200">
                 <div className="inline-flex items-center gap-2 bg-slate-200/60 border border-slate-300/60 px-3 py-1 rounded-full text-xs font-semibold text-slate-800">
                   <span className="truncate max-w-[160px]">{callerName}</span>
                   <span className="text-slate-400">•</span>
