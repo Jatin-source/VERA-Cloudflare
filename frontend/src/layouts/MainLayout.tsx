@@ -85,6 +85,9 @@ const MainLayout: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#070b14] overflow-hidden relative">
         
+        {/* Mobile Top Safe Area Buffer (Prevents status bar, notch & camera punch-hole overlap) */}
+        <div className="md:hidden w-full bg-[#0a101d] shrink-0 h-[max(env(safe-area-inset-top),2.25rem)]" />
+
         {/* Floating Call Mini-Bar when call is connected outside /call */}
         {callState === 'CONNECTED' && location.pathname !== '/call' && (
           <div className="bg-blue-950/80 border-b border-blue-500/40 px-4 py-2.5 flex items-center justify-between text-xs backdrop-blur-md z-30 shadow-lg">

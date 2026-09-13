@@ -127,7 +127,7 @@ const Sessions: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 w-full">
+    <div className="p-4 md:p-8 space-y-6 max-w-7xl mx-auto pb-12 w-full">
       
       {/* Header */}
       <div className="bg-vera-panel border border-vera-border rounded-xl shadow-lg p-5 flex flex-col md:flex-row items-center justify-between gap-4">
