@@ -1,6 +1,10 @@
-def evaluate_policy(risk_analysis: dict, action_context_analysis: dict) -> dict:
+def evaluate_policy(
+    risk_analysis: dict, 
+    action_context_analysis: dict, 
+    identity_claim_analysis: dict = None
+) -> dict:
     """
-    Evaluates the fused risk score and specific action contexts to determine a final policy decision.
+    Evaluates the fused risk score, action contexts, and caller identity claims to determine a final policy decision.
     Rules:
     - low risk → allow
     - medium risk → warn
@@ -9,8 +13,10 @@ def evaluate_policy(risk_analysis: dict, action_context_analysis: dict) -> dict:
     
     Escalation:
     - Critical actions (OTP, financial, remote access, account takeover) escalate the decision by one level.
+    - High-stakes authority impersonation claims mandate identity verification ('verify') or call blocking ('block').
     """
     risk_level = risk_analysis.get("risk_level", "low")
+    risk_signals = risk_analysis.get("contributing_signals", [])
     
     # Base decision
     base_mapping = {
@@ -46,6 +52,27 @@ def evaluate_policy(risk_analysis: dict, action_context_analysis: dict) -> dict:
         escalated = True
         reason = f"Escalated from {base_decision} to {final_decision} due to critical action signals."
         
+    # Milestone 16: Authority Impersonation Policy Enforcement
+    has_claim = False
+    claimed_entity = None
+    if identity_claim_analysis and identity_claim_analysis.get("has_claim"):
+        has_claim = True
+        claimed_entity = identity_claim_analysis.get("claimed_entity")
+    elif "authority_claim_detected" in risk_signals:
+        has_claim = True
+
+    if "impersonation_authority_claim" in risk_signals:
+        if risk_level == "critical":
+            final_decision = "block"
+        else:
+            final_decision = "verify"
+        escalated = True
+        reason = f"Severe authority impersonation threat detected. Caller claimed representation ({claimed_entity or 'Official'})."
+    elif has_claim and decision_hierarchy.index(final_decision) < decision_hierarchy.index("verify"):
+        final_decision = "verify"
+        escalated = True
+        reason = f"Authority claim detected ({claimed_entity or 'Official'}). Out-of-band caller verification recommended."
+
     return {
         "decision": final_decision,
         "escalated": escalated,

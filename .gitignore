@@ -19,6 +19,8 @@ data/pretrained_models/
 # Databases
 data/*.db
 data/vera.db
+backend/*.db
+*.db
 *.sqlite3
 
 # Cached embeddings

@@ -361,6 +361,7 @@ export function useVoIPSignaling() {
     lastChunk,
     veraSessionId,
     veraTelemetry,
+    identityClaim: veraTelemetry?.identity_claim || null,
     isAiConnected,
     fullTranscript,
     detectedSignals,

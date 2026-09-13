@@ -154,3 +154,31 @@ def test_websocket_disconnect():
         websocket.close()
     # If no exception is raised, the server handled the disconnect gracefully
     assert True
+
+@patch("app.services.voice_integrity_service.analyze_voice")
+@patch("app.services.asr_service.transcribe_audio")
+def test_websocket_identity_claim_pipeline(mock_transcribe, mock_analyze):
+    mock_analyze.return_value = {"state": "SPEECH_DETECTED", "ai_voice_probability": 0.04, "voice_integrity_score": 0.96, "confidence": 0.9}
+    
+    resp = client.post("/api/v1/sessions", json={"caller_id": "test_caller"})
+    session_id = resp.json()["session_id"]
+    dummy_wav = create_dummy_wav()
+    audio_b64 = base64.b64encode(dummy_wav).decode("utf-8")
+    
+    with client.websocket_connect(f"/api/v1/ws/sessions/{session_id}") as websocket:
+        # Chunk 1: Caller begins identity representation anchor
+        mock_transcribe.return_value = {"transcript": "Hello, I am calling from", "language": "en"}
+        websocket.send_json({"chunk_id": 1, "audio_data": audio_b64})
+        data1 = websocket.receive_json()
+        assert "identity_claim" in data1
+        
+        # Chunk 2: Sentence continues across boundary: "State Bank of India fraud department"
+        mock_transcribe.return_value = {"transcript": "State Bank of India fraud department", "language": "en"}
+        websocket.send_json({"chunk_id": 2, "audio_data": audio_b64})
+        data2 = websocket.receive_json()
+        assert "identity_claim" in data2
+        assert data2["identity_claim"]["has_claim"] is True
+        assert data2["identity_claim"]["authority_type"] == "FINANCIAL"
+        assert "State Bank of India" in data2["identity_claim"]["claimed_entity"]
+        assert data2["decision"] in ["verify", "block"]
+

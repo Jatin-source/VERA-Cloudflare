@@ -15,6 +15,7 @@ from app.services import voice_integrity_service
 from app.services import asr_service
 from app.services import intent_service
 from app.services import action_context_service
+from app.services import identity_claim_service
 from app.services import risk_fusion_service
 from app.services import policy_service
 
@@ -51,8 +52,21 @@ async def websocket_endpoint(
     MAX_BUFFER_SAMPLES = 48000 # 3.0 seconds at 16kHz
     last_smooth_ai_prob: Optional[float] = None
     
+    # Milestone 15: Rolling conversational transcript context buffer and latched identity claim
+    transcript_history: list[str] = []
+    MAX_TRANSCRIPT_HISTORY = 30 # Maintain last 30 chunk utterances (~30-60s)
+    last_identity_claim = {
+        "has_claim": False,
+        "claimed_entity": None,
+        "authority_type": None,
+        "claimed_role": None,
+        "confidence": 0.0,
+        "raw_claim_text": None,
+        "signals": []
+    }
+    
     async def process_audio_payload(audio_bytes: bytes, chunk_id: Optional[int] = None):
-        nonlocal current_max_risk, audio_history, last_smooth_ai_prob
+        nonlocal current_max_risk, audio_history, last_smooth_ai_prob, transcript_history, last_identity_claim
         temp_audio_path = None
         try:
             if not audio_bytes or len(audio_bytes) < 4000:
@@ -107,7 +121,8 @@ async def websocket_endpoint(
                     "risk_level": current_max_risk,
                     "decision": "neutral",
                     "signals": [],
-                    "state": "NO_SPEECH"
+                    "state": "NO_SPEECH",
+                    "identity_claim": last_identity_claim
                 }
                 if chunk_id is not None:
                     response["chunk_id"] = chunk_id
@@ -119,6 +134,24 @@ async def websocket_endpoint(
             
             transcript = asr_result.get("transcript", "")
             
+            # Milestone 15: Append valid transcript fragment into rolling context buffer
+            if transcript and transcript.strip():
+                clean_frag = transcript.strip()
+                transcript_history.append(clean_frag)
+                if len(transcript_history) > MAX_TRANSCRIPT_HISTORY:
+                    transcript_history.pop(0)
+                    
+            rolling_transcript = " ".join(transcript_history) if transcript_history else transcript
+            
+            # Milestone 15: Analyze Identity Claims over rolling multi-chunk context
+            t_claim_0 = time.perf_counter()
+            claim_result = identity_claim_service.analyze_identity_claim(rolling_transcript)
+            t_claim_1 = time.perf_counter()
+            
+            # Latch identity claim once confirmed
+            if claim_result.get("has_claim"):
+                last_identity_claim = claim_result
+            
             intent_result = intent_service.analyze_intent(transcript)
             t4 = time.perf_counter()
             
@@ -128,7 +161,8 @@ async def websocket_endpoint(
             risk_result = risk_fusion_service.calculate_risk(
                 voice_analysis=voice_result,
                 intent_analysis=intent_result,
-                action_context_analysis=action_context_result
+                action_context_analysis=action_context_result,
+                identity_claim_analysis=last_identity_claim
             )
             t6 = time.perf_counter()
             
@@ -136,6 +170,7 @@ async def websocket_endpoint(
                         f"librosa={t1-t0:.3f}s, "
                         f"voice_integrity={t2-t1:.3f}s, "
                         f"asr={t3-t2:.3f}s, "
+                        f"claim={t_claim_1-t_claim_0:.3f}s, "
                         f"intent={t4-t3:.3f}s, "
                         f"action={t5-t4:.3f}s, "
                         f"risk={t6-t5:.3f}s, "
@@ -151,7 +186,11 @@ async def websocket_endpoint(
             modified_risk_result = dict(risk_result)
             modified_risk_result["risk_level"] = reported_risk_level
             
-            policy_result = policy_service.evaluate_policy(modified_risk_result, action_context_result)
+            policy_result = policy_service.evaluate_policy(
+                modified_risk_result, 
+                action_context_result, 
+                identity_claim_analysis=last_identity_claim
+            )
             
             session_service.update_session(db, session_id, {
                 "risk_level": reported_risk_level,
@@ -168,7 +207,8 @@ async def websocket_endpoint(
                 "overall_risk_score": risk_result.get("overall_risk_score"),
                 "risk_level": reported_risk_level,
                 "decision": policy_result.get("decision"),
-                "signals": risk_result.get("contributing_signals", [])
+                "signals": risk_result.get("contributing_signals", []),
+                "identity_claim": last_identity_claim
             }
             if chunk_id is not None:
                 response["chunk_id"] = chunk_id

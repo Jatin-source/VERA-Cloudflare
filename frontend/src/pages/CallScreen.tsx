@@ -23,7 +23,15 @@ import {
   BrainCircuit,
   Lock,
   FileText,
-  Fingerprint
+  Fingerprint,
+  Building2,
+  BadgeAlert,
+  CheckCircle,
+  Copy,
+  ExternalLink,
+  X,
+  Search,
+  Check
 } from 'lucide-react';
 import { useVoIPSignaling } from '../hooks/useVoIPSignaling';
 
@@ -32,6 +40,101 @@ function formatTimer(seconds: number): string {
   const s = (seconds % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
 }
+
+export interface OfficialEntity {
+  category: string;
+  name: string;
+  phone: string;
+  description: string;
+  badge: string;
+}
+
+export const OFFICIAL_DIRECTORY: OfficialEntity[] = [
+  {
+    category: 'EMERGENCY & CYBER',
+    name: 'National Cyber Crime Helpline',
+    phone: '1930',
+    description: 'Immediate reporting of online financial fraud & cyber impersonation',
+    badge: 'GOVT HELPLINE'
+  },
+  {
+    category: 'EMERGENCY & CYBER',
+    name: 'Police Emergency Support',
+    phone: '112',
+    description: 'National emergency response support system across India',
+    badge: 'EMERGENCY'
+  },
+  {
+    category: 'EMERGENCY & CYBER',
+    name: 'Telecom Fraud (DoT / Sanchar Saathi)',
+    phone: '1963',
+    description: 'Department of Telecommunications reporting for spoofed / scam calls',
+    badge: 'GOVT TRAI'
+  },
+  {
+    category: 'BANKING & FINANCIAL',
+    name: 'Reserve Bank of India (RBI) Fraud Desk',
+    phone: '14440',
+    description: 'Official RBI automated helpline for banking fraud reporting',
+    badge: 'CENTRAL BANK'
+  },
+  {
+    category: 'BANKING & FINANCIAL',
+    name: 'State Bank of India (SBI) Fraud Helpline',
+    phone: '1800111109',
+    description: '24x7 SBI cyber fraud and immediate card/account blocking helpline',
+    badge: 'SBI OFFICIAL'
+  },
+  {
+    category: 'BANKING & FINANCIAL',
+    name: 'HDFC Bank Emergency Fraud Desk',
+    phone: '18002583838',
+    description: 'Dedicated 24/7 hotline to stop unauthorized transactions',
+    badge: 'HDFC OFFICIAL'
+  },
+  {
+    category: 'BANKING & FINANCIAL',
+    name: 'ICICI Bank Fraud Reporting',
+    phone: '18002667777',
+    description: 'Direct line to ICICI fraud prevention cell',
+    badge: 'ICICI OFFICIAL'
+  },
+  {
+    category: 'BANKING & FINANCIAL',
+    name: 'Axis Bank Emergency Cell',
+    phone: '18001035577',
+    description: 'Immediate support for suspected unauthorized debits or phishing',
+    badge: 'AXIS OFFICIAL'
+  },
+  {
+    category: 'BANKING & FINANCIAL',
+    name: 'Punjab National Bank (PNB)',
+    phone: '18001802222',
+    description: 'PNB customer security and suspicious call reporting',
+    badge: 'PNB OFFICIAL'
+  },
+  {
+    category: 'BANKING & FINANCIAL',
+    name: 'Kotak Mahindra Bank',
+    phone: '18602662666',
+    description: 'Kotak 24x7 fraud prevention helpline',
+    badge: 'KOTAK OFFICIAL'
+  },
+  {
+    category: 'TECH & COMMERCE',
+    name: 'Amazon Customer Service',
+    phone: '180030009009',
+    description: 'Amazon verified customer care (never asks for remote desktop access)',
+    badge: 'COMMERCE'
+  },
+  {
+    category: 'TECH & COMMERCE',
+    name: 'Income Tax Department (e-Filing Helpline)',
+    phone: '18001030025',
+    description: 'Official Income Tax helpline (tax officers never call demanding immediate wire transfer)',
+    badge: 'TAX DEPT'
+  }
+];
 
 const CallScreen: React.FC = () => {
   const {
@@ -54,6 +157,7 @@ const CallScreen: React.FC = () => {
     chunksProcessedCount,
     veraSessionId,
     veraTelemetry,
+    identityClaim,
     isAiConnected,
     fullTranscript,
     detectedSignals,
@@ -66,12 +170,36 @@ const CallScreen: React.FC = () => {
   const [targetUser, setTargetUser] = useState('');
   const [isEditingUser, setIsEditingUser] = useState(false);
   const [newUserId, setNewUserId] = useState('');
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [activeVerifyTab, setActiveVerifyTab] = useState<'challenge' | 'directory' | 'block'>('challenge');
+  const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
+  const [directorySearch, setDirectorySearch] = useState('');
+  const [copiedChallenge, setCopiedChallenge] = useState(false);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll transcript container on new text
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [fullTranscript]);
+
+  // Close verification modal if call ends
+  useEffect(() => {
+    if (callState !== 'CONNECTED') {
+      setShowVerifyModal(false);
+    }
+  }, [callState]);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedNumber(id);
+    setTimeout(() => setCopiedNumber(null), 2000);
+  };
+
+  const copyChallengeScript = (script: string) => {
+    navigator.clipboard.writeText(script);
+    setCopiedChallenge(true);
+    setTimeout(() => setCopiedChallenge(false), 2000);
+  };
 
   const handleSwitchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,8 +224,6 @@ const CallScreen: React.FC = () => {
     : 0;
 
   // AI Voice Probability (0.0 to 1.0)
-  // When real human speaks, this yields low numbers (1%, 2%, 3%, 4% etc.)
-  // When AI / synthetic voice is detected, this rises to 70% - 95%
   const rawAiVoice = veraTelemetry?.ai_voice_probability !== undefined && veraTelemetry?.ai_voice_probability !== null
     ? veraTelemetry.ai_voice_probability
     : (veraTelemetry?.voice_integrity_score !== undefined && veraTelemetry?.voice_integrity_score !== null
@@ -107,7 +233,7 @@ const CallScreen: React.FC = () => {
   const aiVoicePercent = Math.round(rawAiVoice * 100);
   const decision = veraTelemetry?.decision?.toUpperCase() || 'ALLOW';
 
-  const isHighThreat = riskLevel === 'high' || riskLevel === 'critical' || decision === 'BLOCK' || aiVoicePercent > 60;
+  const isHighThreat = riskLevel === 'high' || riskLevel === 'critical' || decision === 'BLOCK' || aiVoicePercent > 60 || (identityClaim?.has_claim && overallRisk >= 75);
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
@@ -296,6 +422,79 @@ const CallScreen: React.FC = () => {
             </div>
           )}
 
+          {/* MILESTONE 17: OFFICIAL IDENTITY CLAIM & IMPERSONATION BANNER */}
+          {identityClaim?.has_claim && (
+            <div className="bg-[#1c1305] border-2 border-amber-500/90 p-4 sm:p-5 rounded-2xl shadow-[0_0_30px_rgba(245,158,11,0.25)] space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start space-x-3">
+                  <div className="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 shrink-0 mt-0.5 shadow-[0_0_15px_rgba(245,158,11,0.3)]">
+                    <BadgeAlert size={24} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                        <Building2 size={13} />
+                        Official Identity Claim Detected
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-500/50 text-amber-300 font-mono font-semibold">
+                        {identityClaim.authority_type || 'AUTHORITY'}
+                      </span>
+                      {identityClaim.confidence && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-950/80 border border-blue-500/40 text-blue-300 font-mono">
+                          {Math.round(identityClaim.confidence * 100)}% Match
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-base font-bold text-white mt-1">
+                      Claiming: <span className="text-amber-200 underline decoration-amber-500/50 underline-offset-4">{identityClaim.claimed_entity}</span>
+                      {identityClaim.claimed_role && (
+                        <span className="text-xs font-normal text-gray-300 ml-2">({identityClaim.claimed_role})</span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-amber-200/90 mt-1 leading-relaxed">
+                      Caller states they represent this organization. Legitimate authorities <strong>never</strong> demand OTPs, passwords, or immediate wire transfers over incoming phone calls.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-amber-500/20">
+                <button
+                  onClick={() => {
+                    setActiveVerifyTab('challenge');
+                    setShowVerifyModal(true);
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold text-xs rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/30 transition-all hover:scale-[1.02] active:scale-95"
+                >
+                  <ShieldCheck size={16} />
+                  <span>Verify Caller Identity</span>
+                  <span className="px-1.5 py-0.2 bg-black/20 rounded text-[10px] font-mono uppercase tracking-tight">Out-of-Band</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setActiveVerifyTab('directory');
+                      setShowVerifyModal(true);
+                    }}
+                    className="px-3 py-2 bg-[#121d30] hover:bg-[#1a2842] text-amber-300 border border-amber-500/30 text-xs font-medium rounded-xl flex items-center gap-1.5 transition-all"
+                  >
+                    <PhoneCall size={13} />
+                    <span>Official Numbers</span>
+                  </button>
+                  <button
+                    onClick={endActiveCall}
+                    className="px-3 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all"
+                  >
+                    <PhoneOff size={13} />
+                    <span>Hang Up</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Peer & Call Controls Card */}
           <div className="bg-[#0a101d] border border-[#1a2333] p-6 rounded-3xl shadow-xl text-center space-y-5">
             <div className="relative w-20 h-20 mx-auto">
@@ -404,8 +603,8 @@ const CallScreen: React.FC = () => {
               </span>
             </div>
 
-            {/* Risk Gauges Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Risk & Identity Telemetry Gauges Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Overall Risk Card */}
               <div className="p-3.5 bg-[#0d1627] border border-[#1a2333] rounded-2xl space-y-2">
                 <div className="flex items-center justify-between text-xs">
@@ -476,6 +675,46 @@ const CallScreen: React.FC = () => {
                    aiVoicePercent <= 60 ? 'Acoustic Noise / Compression' :
                    '⚠️ High AI / Deepfake Threat'}
                 </div>
+              </div>
+
+              {/* MILESTONE 17: Caller Identity Claim Card */}
+              <div className="p-3.5 bg-[#0d1627] border border-[#1a2333] rounded-2xl space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-400 flex items-center gap-1">
+                    <Building2 size={13} className={identityClaim?.has_claim ? 'text-amber-400' : 'text-gray-500'} />
+                    Caller Claim
+                  </span>
+                  <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                    identityClaim?.has_claim ? 'bg-amber-950 text-amber-300 border border-amber-500/40' : 'bg-gray-800 text-gray-400'
+                  }`}>
+                    {identityClaim?.has_claim ? 'CLAIM DETECTED' : 'STANDARD'}
+                  </span>
+                </div>
+                
+                <div className="text-xs font-bold text-white truncate">
+                  {identityClaim?.has_claim ? (
+                    <span className="text-amber-300">{identityClaim.claimed_entity}</span>
+                  ) : (
+                    <span className="text-gray-400 font-normal">No Authority Claim</span>
+                  )}
+                </div>
+
+                {identityClaim?.has_claim ? (
+                  <button
+                    onClick={() => {
+                      setActiveVerifyTab('challenge');
+                      setShowVerifyModal(true);
+                    }}
+                    className="w-full py-1 px-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-[10px] font-semibold flex items-center justify-center gap-1 transition-all"
+                  >
+                    <ShieldCheck size={12} />
+                    <span>Verify Identity</span>
+                  </button>
+                ) : (
+                  <div className="text-[10px] text-gray-500">
+                    Regular peer-to-peer call
+                  </div>
+                )}
               </div>
 
               {/* Decision Policy Card */}
@@ -616,6 +855,251 @@ const CallScreen: React.FC = () => {
           </div>
         </div>
       )}
+      {/* MILESTONE 18: IN-CALL OUT-OF-BAND VERIFICATION SUITE MODAL */}
+      {showVerifyModal && callState === 'CONNECTED' && (
+        <div className="fixed inset-0 z-40 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-[#0a101d] border-2 border-amber-500/60 rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-[0_0_60px_rgba(245,158,11,0.25)] space-y-4 my-auto relative animate-in fade-in duration-200">
+            {/* Live Audio Continuity Indicator */}
+            <div className="flex items-center justify-between bg-[#121d30] border border-[#1a2333] px-3.5 py-2 rounded-xl text-xs">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-gray-300 font-medium">
+                  Live Call Active: <strong className="text-white">{peerId}</strong> ({formatTimer(callDuration)})
+                </span>
+              </div>
+              <span className="text-[10px] text-emerald-400 font-mono">Audio Non-Disrupted</span>
+            </div>
+
+            {/* Modal Header & Close */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <ShieldCheck className="text-amber-400" size={22} />
+                  <span>Out-of-Band Identity Verification</span>
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Caller claims: <span className="text-amber-300 font-semibold">{identityClaim?.claimed_entity || 'Authority Organization'}</span>
+                  {identityClaim?.claimed_role && <span className="text-gray-400"> ({identityClaim.claimed_role})</span>}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowVerifyModal(false)}
+                className="p-1.5 rounded-xl bg-[#121d30] hover:bg-[#1a2842] text-gray-400 hover:text-white border border-[#1a2333] transition-all"
+                title="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#070b14] border border-[#1a2333] rounded-2xl text-xs">
+              <button
+                onClick={() => setActiveVerifyTab('challenge')}
+                className={`py-2 px-2.5 rounded-xl font-medium transition-all flex items-center justify-center gap-1.5 ${
+                  activeVerifyTab === 'challenge'
+                    ? 'bg-amber-500 text-black font-bold shadow-md shadow-amber-500/20'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <CheckCircle size={14} />
+                <span>In-App Challenge</span>
+              </button>
+
+              <button
+                onClick={() => setActiveVerifyTab('directory')}
+                className={`py-2 px-2.5 rounded-xl font-medium transition-all flex items-center justify-center gap-1.5 ${
+                  activeVerifyTab === 'directory'
+                    ? 'bg-amber-500 text-black font-bold shadow-md shadow-amber-500/20'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <PhoneCall size={14} />
+                <span>Official Directory</span>
+              </button>
+
+              <button
+                onClick={() => setActiveVerifyTab('block')}
+                className={`py-2 px-2.5 rounded-xl font-medium transition-all flex items-center justify-center gap-1.5 ${
+                  activeVerifyTab === 'block'
+                    ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-600/20'
+                    : 'text-gray-400 hover:text-rose-400'
+                }`}
+              >
+                <PhoneOff size={14} />
+                <span>Hang Up & Block</span>
+              </button>
+            </div>
+
+            {/* TAB 1: IN-APP PUSH CHALLENGE PROTOCOL */}
+            {activeVerifyTab === 'challenge' && (
+              <div className="space-y-3 pt-1">
+                <div className="p-3.5 bg-[#0d1627] border border-amber-500/30 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between text-xs text-amber-300 font-semibold">
+                    <span>Read this verbatim to the caller:</span>
+                    <button
+                      onClick={() => copyChallengeScript("Before we proceed, please trigger an official in-app verification push notification to my registered mobile app. I will check it now.")}
+                      className="text-[10px] px-2 py-0.5 rounded bg-[#121d30] border border-amber-500/40 text-amber-300 hover:text-white flex items-center gap-1 transition-all"
+                    >
+                      {copiedChallenge ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                      <span>{copiedChallenge ? 'Copied Script!' : 'Copy Script'}</span>
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-200 italic font-mono bg-[#070b14] p-3 rounded-xl border border-[#1a2333] leading-relaxed">
+                    "Before we proceed, please trigger an official in-app verification push notification to my registered mobile app. I will check it now."
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-xs text-gray-300">
+                  <div className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-400 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">1</span>
+                    <span>Genuine financial fraud desks can send in-app push authorization alerts directly into your official banking app.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-400 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">2</span>
+                    <span><strong>Never</strong> accept SMS links or install remote apps (AnyDesk, TeamViewer) at caller's request.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-rose-600/20 border border-rose-500/40 text-rose-400 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">3</span>
+                    <span>If caller threatens police action, account freeze, or refuses in-app push: <strong>It is an active scam. Hang up immediately.</strong></span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: VERIFIED OFFICIAL CALLBACK DIRECTORY */}
+            {activeVerifyTab === 'directory' && (
+              <div className="space-y-3 pt-1">
+                {/* Search Bar */}
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-3 text-gray-400" />
+                  <input
+                    type="text"
+                    value={directorySearch}
+                    onChange={(e) => setDirectorySearch(e.target.value)}
+                    placeholder="Search bank, cyber cell, or emergency helpline..."
+                    className="w-full bg-[#0d1627] border border-[#1a2333] text-white text-xs pl-8 pr-3 py-2.5 rounded-xl focus:outline-none focus:border-amber-500 transition-colors"
+                  />
+                </div>
+
+                {/* Directory List */}
+                <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                  {OFFICIAL_DIRECTORY
+                    .filter((item) => {
+                      if (!directorySearch.trim()) return true;
+                      const q = directorySearch.toLowerCase();
+                      return item.name.toLowerCase().includes(q) || item.phone.includes(q) || item.category.toLowerCase().includes(q);
+                    })
+                    .sort((a, b) => {
+                      // Rank matched entity claim first
+                      const claimName = (identityClaim?.claimed_entity || '').toLowerCase();
+                      const matchA = claimName && a.name.toLowerCase().includes(claimName.split(' ')[0].toLowerCase());
+                      const matchB = claimName && b.name.toLowerCase().includes(claimName.split(' ')[0].toLowerCase());
+                      if (matchA && !matchB) return -1;
+                      if (!matchA && matchB) return 1;
+                      return 0;
+                    })
+                    .map((item, idx) => {
+                      const claimName = (identityClaim?.claimed_entity || '').toLowerCase();
+                      const isMatched = claimName && item.name.toLowerCase().includes(claimName.split(' ')[0].toLowerCase());
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-2xl border transition-all ${
+                            isMatched
+                              ? 'bg-amber-950/40 border-amber-500/70 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+                              : 'bg-[#0d1627] border-[#1a2333] hover:border-gray-700'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <h4 className="text-xs font-bold text-white">{item.name}</h4>
+                                {isMatched && (
+                                  <span className="text-[9px] px-1.5 py-0.2 bg-amber-500 text-black font-bold rounded uppercase">
+                                    Caller Claim Match
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-gray-400 mt-0.5">{item.description}</p>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#121d30] border border-[#1a2333] text-gray-300 font-mono shrink-0">
+                              {item.badge}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 mt-2 border-t border-[#1a2333]/80">
+                            <span className="text-sm font-bold font-mono text-emerald-400 tracking-wider">
+                              {item.phone}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => copyToClipboard(item.phone, item.phone)}
+                                className="px-2.5 py-1 bg-[#121d30] hover:bg-[#1a2842] text-gray-300 hover:text-white border border-[#1a2333] rounded-lg text-[11px] font-medium flex items-center gap-1 transition-all"
+                              >
+                                {copiedNumber === item.phone ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                                <span>{copiedNumber === item.phone ? 'Copied!' : 'Copy'}</span>
+                              </button>
+                              <a
+                                href={`tel:${item.phone}`}
+                                className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-[11px] font-medium flex items-center gap-1 transition-all"
+                              >
+                                <ExternalLink size={11} />
+                                <span>Dial</span>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: SAFE HANGUP & BLOCK */}
+            {activeVerifyTab === 'block' && (
+              <div className="space-y-4 pt-1">
+                <div className="p-4 bg-rose-950/40 border border-rose-500/40 rounded-2xl space-y-2">
+                  <h4 className="text-sm font-bold text-rose-300 flex items-center gap-2">
+                    <AlertTriangle size={16} className="text-rose-400" />
+                    <span>Safe Call Termination & Protection</span>
+                  </h4>
+                  <p className="text-xs text-rose-200/90 leading-relaxed">
+                    It is always 100% safe to disconnect an incoming call. Legitimate banks and government agencies will never take punitive action against you for hanging up to verify independently.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      endActiveCall();
+                      setShowVerifyModal(false);
+                    }}
+                    className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition-all hover:scale-[1.01] active:scale-95"
+                  >
+                    <PhoneOff size={18} />
+                    <span>Hang Up Active Call Now</span>
+                  </button>
+
+                  <p className="text-[10px] text-gray-500 text-center font-mono">
+                    After hanging up, dial the verified official hotline from the directory tab.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Modal Actions */}
+            <div className="pt-2 border-t border-[#1a2333] flex items-center justify-end">
+              <button
+                onClick={() => setShowVerifyModal(false)}
+                className="px-4 py-2 bg-[#121d30] hover:bg-[#1a2842] text-gray-300 hover:text-white border border-[#1a2333] rounded-xl text-xs font-semibold transition-all"
+              >
+                Return to Live Call
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Milestone 7: Ear Guard Screen Touch Lock Overlay */}
       {isTouchLocked && callState === 'CONNECTED' && (
         <div 

@@ -1,5 +1,15 @@
 import { getBaseUrl } from './api';
 
+export interface IdentityClaimData {
+  has_claim: boolean;
+  claimed_entity?: string | null;
+  authority_type?: string | null;
+  claimed_role?: string | null;
+  confidence?: number;
+  raw_claim_text?: string | null;
+  signals?: string[];
+}
+
 export interface VeraTelemetry {
   session_id: string;
   chunk_id?: number;
@@ -11,6 +21,7 @@ export interface VeraTelemetry {
   risk_level?: 'low' | 'medium' | 'high' | 'critical' | string;
   decision?: 'ALLOW' | 'MONITOR' | 'CHALLENGE' | 'BLOCK' | string;
   signals?: Array<any>;
+  identity_claim?: IdentityClaimData;
   error?: string;
 }
 

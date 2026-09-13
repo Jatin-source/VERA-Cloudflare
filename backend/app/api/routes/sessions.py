@@ -163,6 +163,25 @@ async def analyze_session_action_context(session_id: str, file: UploadFile = Fil
 
 
 # ---------------------------------------------------------------------------
+# POST /{session_id}/identity-claim  – ASR → Identity Claim Detection
+# ---------------------------------------------------------------------------
+
+@router.post("/{session_id}/identity-claim")
+async def analyze_session_identity_claim(session_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    _validate_audio(file, session_id, db)
+    from app.services import audio_service, asr_service, identity_claim_service
+    try:
+        y, sr, _, filename = await audio_service.load_and_normalize_audio(file)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    asr_result = asr_service.transcribe_audio(y, sr)
+    transcript = asr_result.get("transcript", "")
+    claim_result = identity_claim_service.analyze_identity_claim(transcript)
+    return ok(session_id, {"filename": filename, "transcript": transcript, "identity_claim": claim_result})
+
+
+# ---------------------------------------------------------------------------
 # POST /{session_id}/risk  – full pipeline except policy/evidence
 # ---------------------------------------------------------------------------
 
@@ -175,7 +194,7 @@ async def analyze_session_risk(
 ):
     _validate_audio(file, session_id, db)
     from app.services import audio_service, asr_service, intent_service, action_context_service
-    from app.services import voice_integrity_service, risk_fusion_service
+    from app.services import voice_integrity_service, risk_fusion_service, identity_claim_service
     try:
         y, sr, _, filename = await audio_service.load_and_normalize_audio(file)
     except Exception as e:
@@ -195,13 +214,15 @@ async def analyze_session_risk(
     transcript = asr_result.get("transcript", "")
     intent_result = intent_service.analyze_intent(transcript)
     action_context_result = action_context_service.analyze_action_context(transcript, intent_result)
+    claim_result = identity_claim_service.analyze_identity_claim(transcript)
 
     risk_result = risk_fusion_service.calculate_risk(
         voice_analysis=voice_result,
         intent_analysis=intent_result,
         action_context_analysis=action_context_result,
+        identity_claim_analysis=claim_result,
     )
-    return ok(session_id, {"filename": filename, "transcript": transcript, "risk_analysis": risk_result})
+    return ok(session_id, {"filename": filename, "transcript": transcript, "risk_analysis": risk_result, "identity_claim": claim_result})
 
 
 # ---------------------------------------------------------------------------
@@ -217,7 +238,7 @@ async def evaluate_session_decision(
 ):
     _validate_audio(file, session_id, db)
     from app.services import audio_service, asr_service, intent_service, action_context_service
-    from app.services import voice_integrity_service, risk_fusion_service, policy_service
+    from app.services import voice_integrity_service, risk_fusion_service, policy_service, identity_claim_service
     try:
         y, sr, _, filename = await audio_service.load_and_normalize_audio(file)
     except Exception as e:
@@ -233,13 +254,19 @@ async def evaluate_session_decision(
     transcript = asr_result.get("transcript", "")
     intent_result = intent_service.analyze_intent(transcript)
     action_context_result = action_context_service.analyze_action_context(transcript, intent_result)
+    claim_result = identity_claim_service.analyze_identity_claim(transcript)
 
     risk_result = risk_fusion_service.calculate_risk(
         voice_analysis=voice_result,
         intent_analysis=intent_result,
         action_context_analysis=action_context_result,
+        identity_claim_analysis=claim_result,
     )
-    policy_result = policy_service.evaluate_policy(risk_result, action_context_result)
+    policy_result = policy_service.evaluate_policy(
+        risk_result, 
+        action_context_result, 
+        identity_claim_analysis=claim_result
+    )
     
     session_service.update_session(db, session_id, {
         "risk_level": risk_result.get("risk_level"),
@@ -247,7 +274,7 @@ async def evaluate_session_decision(
         "status": "completed"
     })
     
-    return ok(session_id, {"filename": filename, "policy": policy_result})
+    return ok(session_id, {"filename": filename, "policy": policy_result, "identity_claim": claim_result})
 
 
 # ---------------------------------------------------------------------------
