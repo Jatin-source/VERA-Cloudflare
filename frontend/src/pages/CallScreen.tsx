@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { useVoIP } from '../context/VoIPContext';
 import { CallerLocationMap } from '../components/CallerLocationMap';
+import { api, type VoiceProfile } from '../services/api';
 
 function formatTimer(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -186,6 +187,19 @@ const CallScreen: React.FC = () => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [fullTranscript]);
 
+  // Lookup enrolled trusted speaker profile for caller
+  const [enrolledProfile, setEnrolledProfile] = useState<VoiceProfile | null>(null);
+
+  useEffect(() => {
+    if (callState === 'CONNECTED' && peerId) {
+      api.lookupVoiceProfile(peerId)
+        .then(prof => setEnrolledProfile(prof))
+        .catch(() => setEnrolledProfile(null));
+    } else if (callState !== 'CONNECTED') {
+      setEnrolledProfile(null);
+    }
+  }, [callState, peerId]);
+
   // Close verification modal if call ends
   useEffect(() => {
     if (callState !== 'CONNECTED') {
@@ -237,7 +251,28 @@ const CallScreen: React.FC = () => {
   const aiVoicePercent = Math.round(rawAiVoice * 100);
   const decision = veraTelemetry?.decision?.toUpperCase() || 'ALLOW';
 
-  const isHighThreat = riskLevel === 'high' || riskLevel === 'critical' || decision === 'BLOCK' || aiVoicePercent > 60 || (identityClaim?.has_claim && overallRisk >= 75);
+  // Speaker Voiceprint Verification & Impersonation Detection
+  const speakerVerif = veraTelemetry?.speaker_verification;
+  const activeProfile = enrolledProfile || (speakerVerif?.has_profile ? {
+    profile_id: speakerVerif.profile_id || '',
+    user_id: peerId,
+    display_name: speakerVerif.display_name || peerId,
+    relationship: speakerVerif.relationship || 'Trusted Contact',
+    model_name: 'vera-acoustic-imprint-v1',
+    sample_duration: 0,
+    total_calls_verified: 0,
+    last_verified_at: null,
+    created_at: ''
+  } : null);
+
+  const speakerSimScore = veraTelemetry?.speaker_similarity_score ?? speakerVerif?.similarity_score;
+  const speakerSimPercent = speakerVerif?.similarity_percentage !== undefined && speakerVerif?.similarity_percentage !== null
+    ? speakerVerif.similarity_percentage
+    : (speakerSimScore !== null && speakerSimScore !== undefined ? Math.round(speakerSimScore * 100) : null);
+  const isCloneAttack = Boolean(speakerVerif?.is_clone_attack || speakerVerif?.status === 'AI_CLONE_IMPERSONATION');
+  const isSpeakerMatch = Boolean(speakerVerif?.is_match);
+
+  const isHighThreat = riskLevel === 'high' || riskLevel === 'critical' || decision === 'BLOCK' || aiVoicePercent > 60 || (identityClaim?.has_claim && overallRisk >= 75) || isCloneAttack;
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
@@ -513,11 +548,51 @@ const CallScreen: React.FC = () => {
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold text-white">{peerId}</h2>
-              <div className="inline-flex items-center px-3 py-1 mt-1 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 text-xs font-mono">
+              {activeProfile ? (
+                <div className="space-y-1">
+                  <h2 className="text-2xl font-bold text-white flex items-center justify-center gap-2">
+                    {activeProfile.display_name}
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono font-medium">
+                      {activeProfile.relationship}
+                    </span>
+                  </h2>
+                  <div className="text-xs text-slate-400 font-mono">{peerId}</div>
+                </div>
+              ) : (
+                <h2 className="text-2xl font-bold text-white">{peerId}</h2>
+              )}
+              <div className="inline-flex items-center px-3 py-1 mt-1.5 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 text-xs font-mono">
                 <Clock size={12} className="mr-1.5" /> {formatTimer(callDuration)}
               </div>
             </div>
+
+            {/* Real-Time Speaker Voiceprint & AI Clone Banners */}
+            {isCloneAttack ? (
+              <div className="mx-auto max-w-lg p-4 rounded-2xl bg-gradient-to-r from-red-950 to-red-900 border-2 border-red-500 text-red-200 text-xs shadow-[0_0_35px_rgba(239,68,68,0.5)] animate-pulse space-y-1.5 text-center">
+                <div className="flex items-center justify-center gap-2 font-bold text-red-400 text-sm tracking-wide">
+                  <ShieldAlert size={20} className="animate-bounce text-red-400" />
+                  <span>CRITICAL: SYNTHETIC AI VOICE CLONE DETECTED!</span>
+                </div>
+                <p className="text-xs text-red-200 leading-relaxed">
+                  Incoming audio exhibits synthetic deepfake artifacts mimicking trusted contact <strong>"{activeProfile?.display_name || peerId}"</strong>. Do not verify OTPs, passwords, or initiate funds transfers!
+                </p>
+              </div>
+            ) : isSpeakerMatch ? (
+              <div className="mx-auto max-w-md p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                <CheckCircle size={16} className="text-emerald-400 flex-shrink-0" />
+                <span>Authentic Voice Verified: {activeProfile?.display_name || peerId} ({speakerSimPercent}% Voiceprint Match)</span>
+              </div>
+            ) : speakerVerif?.status === 'SPEAKER_MISMATCH' ? (
+              <div className="mx-auto max-w-md p-2.5 rounded-xl bg-amber-950/60 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                <AlertTriangle size={16} className="text-amber-400 flex-shrink-0" />
+                <span>Voiceprint Mismatch: Caller acoustic imprint does not match {activeProfile?.display_name || 'enrolled contact'} ({speakerSimPercent}% match)</span>
+              </div>
+            ) : activeProfile ? (
+              <div className="mx-auto max-w-md p-1.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 text-[11px] font-mono flex items-center justify-center gap-1.5">
+                <Fingerprint size={13} className="text-cyan-400 flex-shrink-0" />
+                <span>Biometric Shield Active: Comparing live speech against {activeProfile.display_name}'s voiceprint</span>
+              </div>
+            ) : null}
 
             {/* P2P Status Badge */}
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
@@ -625,7 +700,7 @@ const CallScreen: React.FC = () => {
             </div>
 
             {/* Risk & Identity Telemetry Gauges Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
               {/* Overall Risk Card */}
               <div className="p-3.5 bg-[#0d1627] border border-[#1a2333] rounded-2xl space-y-2">
                 <div className="flex items-center justify-between text-xs">
@@ -655,6 +730,56 @@ const CallScreen: React.FC = () => {
                     }`}
                     style={{ width: `${overallRisk}%` }}
                   ></div>
+                </div>
+              </div>
+
+              {/* Trusted Speaker Voiceprint & Clone Defense Card */}
+              <div className="p-3.5 bg-[#0d1627] border border-[#1a2333] rounded-2xl space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-400 flex items-center gap-1">
+                    <Fingerprint size={13} className={isCloneAttack ? 'text-red-400 animate-pulse' : isSpeakerMatch ? 'text-emerald-400' : 'text-cyan-400'} />
+                    Speaker Imprint
+                  </span>
+                  <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                    isCloneAttack ? 'bg-red-950 text-red-300 border border-red-500/40 animate-pulse' :
+                    isSpeakerMatch ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' :
+                    speakerVerif?.status === 'SPEAKER_MISMATCH' ? 'bg-amber-950 text-amber-300 border border-amber-500/40' :
+                    'bg-cyan-950 text-cyan-300 border border-cyan-500/40'
+                  }`}>
+                    {isCloneAttack ? 'CLONE SPOOF' :
+                     isSpeakerMatch ? 'MATCH' :
+                     speakerVerif?.status === 'SPEAKER_MISMATCH' ? 'MISMATCH' :
+                     activeProfile ? 'LISTENING' : 'NO PROFILE'}
+                  </span>
+                </div>
+
+                <div className="text-xl font-bold text-white font-mono flex items-baseline gap-1">
+                  <span>{speakerSimPercent !== null ? `${speakerSimPercent}%` : '--'}</span>
+                  <span className="text-[10px] font-normal text-gray-400">match</span>
+                </div>
+
+                <div className="w-full h-1.5 bg-[#070b14] rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all duration-300 ${
+                      isCloneAttack ? 'bg-red-500' :
+                      isSpeakerMatch ? 'bg-emerald-500' :
+                      speakerVerif?.status === 'SPEAKER_MISMATCH' ? 'bg-amber-500' :
+                      'bg-cyan-500'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(2, speakerSimPercent || 0))}%` }}
+                  ></div>
+                </div>
+
+                <div className={`text-[10px] font-medium truncate ${
+                  isCloneAttack ? 'text-red-400 font-bold' :
+                  isSpeakerMatch ? 'text-emerald-400' :
+                  speakerVerif?.status === 'SPEAKER_MISMATCH' ? 'text-amber-400' :
+                  'text-slate-400'
+                }`}>
+                  {isCloneAttack ? '⚠️ Deepfake Clone Alert!' :
+                   isSpeakerMatch ? `Verified: ${activeProfile?.display_name || 'Contact'}` :
+                   speakerVerif?.status === 'SPEAKER_MISMATCH' ? 'Mismatched voiceprint' :
+                   activeProfile ? `Monitoring ${activeProfile.display_name}` : 'No enrolled voiceprint'}
                 </div>
               </div>
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, LargeBinary
+from sqlalchemy import Column, Integer, String, DateTime, Text, LargeBinary, Float
 from datetime import datetime
 from app.db.database import Base
 
@@ -17,10 +17,16 @@ class VoiceProfileModel(Base):
     __tablename__ = "voice_profiles"
 
     profile_id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, index=True)
+    user_id = Column(String, index=True)                           # Phone number or Caller ID (e.g. +919876543210, User_A, Shivvy)
+    display_name = Column(String, nullable=True)                  # Contact Name (e.g. Mom, Dad, Shivvy, Akil Modi)
+    relationship = Column(String, default="Trusted Contact")      # Family, Colleague, Friend, VIP, Banker
+    model_name = Column(String, default="vera-acoustic-imprint-v1")
+    embedding = Column(LargeBinary)                               # 128-dim float32 L2-normalized vector
+    features_json = Column(Text, default="{}")                    # Pitch, spectral centroid, formants JSON
+    sample_duration = Column(Float, default=0.0)                  # Sample audio length in seconds
+    total_calls_verified = Column(Integer, default=0)             # Match counter
+    last_verified_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    model_name = Column(String)
-    embedding = Column(LargeBinary)
 
 class CallerReputationModel(Base):
     __tablename__ = "caller_reputation"

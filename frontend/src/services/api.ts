@@ -21,6 +21,39 @@ export interface CallerReputation {
   last_call_timestamp?: string | null;
 }
 
+export interface VoiceProfile {
+  profile_id: string;
+  user_id: string;
+  display_name: string;
+  relationship: string;
+  model_name: string;
+  sample_duration: number;
+  total_calls_verified: number;
+  last_verified_at: string | null;
+  created_at: string;
+  features?: {
+    pitch_mean_hz?: number;
+    pitch_std_hz?: number;
+    spectral_centroid_hz?: number;
+    spectral_rolloff_hz?: number;
+    spectral_bandwidth_hz?: number;
+    voiced_percentage?: number;
+    duration_sec?: number;
+  };
+}
+
+export interface SpeakerVerificationStatus {
+  has_profile: boolean;
+  profile_id?: string | null;
+  display_name?: string | null;
+  relationship?: string | null;
+  similarity_score?: number | null;
+  similarity_percentage?: number | null;
+  status: 'AUTHENTIC_MATCH' | 'UNCERTAIN' | 'MISMATCH' | 'AI_CLONE_IMPERSONATION' | 'AWAITING_SPEECH' | 'NO_ENROLLED_PROFILE' | string;
+  is_match?: boolean | null;
+  is_clone_attack?: boolean;
+}
+
 export interface SessionResponse {
   id: number;
   session_id: string;
@@ -263,6 +296,35 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_scam: isScam, tag })
+    }),
+
+  getVoiceProfiles: (): Promise<VoiceProfile[]> =>
+    fetchWithHandle('/api/v1/voice-profiles', {
+      headers: { 'Content-Type': 'application/json' }
+    }),
+
+  lookupVoiceProfile: (userId: string): Promise<VoiceProfile> =>
+    fetchWithHandle(`/api/v1/voice-profiles/lookup/${encodeURIComponent(userId)}`, {
+      headers: { 'Content-Type': 'application/json' }
+    }),
+
+  enrollVoiceProfile: (data: { userId: string; displayName?: string; relationship?: string; audioBlob: Blob }): Promise<VoiceProfile> => {
+    const formData = new FormData();
+    formData.append('user_id', data.userId);
+    if (data.displayName) formData.append('display_name', data.displayName);
+    if (data.relationship) formData.append('relationship', data.relationship);
+    const filename = data.audioBlob.type.includes('webm') ? 'voiceprint.webm' : 'voiceprint.wav';
+    formData.append('file', data.audioBlob, filename);
+    return fetchWithHandle('/api/v1/voice-profiles', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  deleteVoiceProfile: (profileId: string): Promise<{ status: string; profile_id: string }> =>
+    fetchWithHandle(`/api/v1/voice-profiles/${encodeURIComponent(profileId)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
     })
 };
 

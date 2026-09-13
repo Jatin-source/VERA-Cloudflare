@@ -65,9 +65,29 @@ async def websocket_endpoint(
         "signals": []
     }
     session_counted_in_rep = False
+
+    # Trusted Speaker Profile Biometric Verification
+    from app.services import voice_profile_service, speaker_verification_service
+    matched_profile = None
+    if profile_id:
+        matched_profile = voice_profile_service.get_profile(db, profile_id)
+    if not matched_profile and db_session.caller_id:
+        matched_profile = voice_profile_service.get_profile_by_user_id(db, db_session.caller_id)
+        
+    last_speaker_verif = {
+        "has_profile": matched_profile is not None,
+        "profile_id": matched_profile.profile_id if matched_profile else None,
+        "display_name": matched_profile.display_name if matched_profile else None,
+        "relationship": matched_profile.relationship if matched_profile else None,
+        "similarity_score": None,
+        "similarity_percentage": None,
+        "status": "AWAITING_SPEECH" if matched_profile else "NO_ENROLLED_PROFILE",
+        "is_match": None,
+        "is_clone_attack": False
+    }
     
     async def process_audio_payload(audio_bytes: bytes, chunk_id: Optional[int] = None):
-        nonlocal current_max_risk, audio_history, last_smooth_ai_prob, transcript_history, last_identity_claim, session_counted_in_rep
+        nonlocal current_max_risk, audio_history, last_smooth_ai_prob, transcript_history, last_identity_claim, session_counted_in_rep, last_speaker_verif, matched_profile
         temp_audio_path = None
         try:
             if not audio_bytes or len(audio_bytes) < 4000:
@@ -117,7 +137,8 @@ async def websocket_endpoint(
                     "ai_voice_probability": held_ai_prob,
                     "voice_integrity_score": held_vi_score,
                     "spoof_signal": held_spoof,
-                    "speaker_similarity_score": None,
+                    "speaker_similarity_score": last_speaker_verif.get("similarity_score"),
+                    "speaker_verification": last_speaker_verif,
                     "overall_risk_score": None,
                     "risk_level": current_max_risk,
                     "decision": "neutral",
@@ -166,6 +187,65 @@ async def websocket_endpoint(
                 identity_claim_analysis=last_identity_claim
             )
             t6 = time.perf_counter()
+
+            # Trusted Speaker Biometric Verification & Impersonation Defense
+            speaker_sim_score = None
+            if matched_profile and matched_profile.embedding:
+                try:
+                    p_feat = json.loads(matched_profile.features_json) if matched_profile.features_json else {}
+                    verif = speaker_verification_service.verify_live_speech(
+                        enrolled_embedding_bytes=matched_profile.embedding,
+                        incoming_audio=y,
+                        sr=sr,
+                        enrolled_features=p_feat
+                    )
+                    speaker_sim_score = verif.get("similarity_score")
+                    is_match = verif.get("is_match", False)
+                    verif_status = verif.get("status", "UNKNOWN")
+                    ai_prob = voice_result.get("ai_voice_probability") or 0.0
+
+                    is_clone_attack = False
+                    if ai_prob >= 0.58:
+                        # High probability of AI synthesis pretending to be trusted speaker
+                        is_clone_attack = True
+                        verif_status = "AI_CLONE_IMPERSONATION"
+                        is_match = False
+                        risk_result.setdefault("contributing_signals", []).append({
+                            "type": "AI_SPEAKER_CLONE_ATTACK",
+                            "severity": "CRITICAL",
+                            "message": f"CRITICAL: Synthetic AI Voice Clone detected impersonating enrolled contact '{matched_profile.display_name}' ({matched_profile.relationship})!"
+                        })
+                        current_max_risk = "critical"
+                    elif not is_match and (speaker_sim_score is not None and speaker_sim_score < 0.65):
+                        verif_status = "SPEAKER_MISMATCH"
+                        risk_result.setdefault("contributing_signals", []).append({
+                            "type": "SPEAKER_VOICEPRINT_MISMATCH",
+                            "severity": "HIGH",
+                            "message": f"Voiceprint mismatch: Caller voice does not match {matched_profile.display_name}'s enrolled imprint ({verif.get('similarity_percentage', 0)}% match)."
+                        })
+                        if get_risk_weight("high") > get_risk_weight(current_max_risk):
+                            current_max_risk = "high"
+                    elif is_match and ai_prob < 0.35:
+                        voice_profile_service.record_verification_match(db, matched_profile.profile_id)
+                        risk_result.setdefault("contributing_signals", []).append({
+                            "type": "AUTHENTIC_SPEAKER_VERIFIED",
+                            "severity": "SAFE",
+                            "message": f"Biometric voiceprint verified: Authentic {matched_profile.display_name} ({matched_profile.relationship}) ({verif.get('similarity_percentage', 0)}% match)."
+                        })
+
+                    last_speaker_verif = {
+                        "has_profile": True,
+                        "profile_id": matched_profile.profile_id,
+                        "display_name": matched_profile.display_name,
+                        "relationship": matched_profile.relationship,
+                        "similarity_score": speaker_sim_score,
+                        "similarity_percentage": verif.get("similarity_percentage"),
+                        "status": verif_status,
+                        "is_match": is_match,
+                        "is_clone_attack": is_clone_attack
+                    }
+                except Exception as spk_err:
+                    logger.warning(f"Speaker verification error: {spk_err}")
             
             logger.info(f"LATENCY ANALYSIS [chunk={chunk_id}]: "
                         f"librosa={t1-t0:.3f}s, "
@@ -192,6 +272,9 @@ async def websocket_endpoint(
                 action_context_result, 
                 identity_claim_analysis=last_identity_claim
             )
+
+            if last_speaker_verif.get("is_clone_attack"):
+                policy_result["decision"] = "BLOCK"
             
             session_service.update_session(db, session_id, {
                 "risk_level": reported_risk_level,
@@ -203,7 +286,7 @@ async def websocket_endpoint(
                 db_sess = session_service.get_session(db, session_id)
                 if db_sess and db_sess.caller_id:
                     from app.services import reputation_service
-                    has_spoof = (voice_result.get("ai_voice_probability") or 0.0) >= 0.65
+                    has_spoof = (voice_result.get("ai_voice_probability") or 0.0) >= 0.65 or last_speaker_verif.get("is_clone_attack", False)
                     is_new = not session_counted_in_rep
                     session_counted_in_rep = True
                     reputation_service.record_session_outcome(
@@ -224,7 +307,8 @@ async def websocket_endpoint(
                 "ai_voice_probability": voice_result.get("ai_voice_probability"),
                 "voice_integrity_score": voice_result.get("voice_integrity_score"),
                 "spoof_signal": voice_result.get("spoof_signal"),
-                "speaker_similarity_score": None,
+                "speaker_similarity_score": speaker_sim_score or last_speaker_verif.get("similarity_score"),
+                "speaker_verification": last_speaker_verif,
                 "overall_risk_score": risk_result.get("overall_risk_score"),
                 "risk_level": reported_risk_level,
                 "decision": policy_result.get("decision"),

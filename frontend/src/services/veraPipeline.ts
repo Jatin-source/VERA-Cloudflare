@@ -17,6 +17,18 @@ export interface VeraTelemetry {
   ai_voice_probability?: number;
   voice_integrity_score?: number;
   spoof_signal?: number;
+  speaker_similarity_score?: number | null;
+  speaker_verification?: {
+    has_profile: boolean;
+    profile_id?: string | null;
+    display_name?: string | null;
+    relationship?: string | null;
+    similarity_score?: number | null;
+    similarity_percentage?: number | null;
+    status: string;
+    is_match?: boolean | null;
+    is_clone_attack?: boolean;
+  };
   overall_risk_score?: number;
   risk_level?: 'low' | 'medium' | 'high' | 'critical' | string;
   decision?: 'ALLOW' | 'MONITOR' | 'CHALLENGE' | 'BLOCK' | string;
