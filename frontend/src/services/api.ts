@@ -59,6 +59,15 @@ export interface EvidenceResponse {
 export const DEFAULT_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://noon-paintings-api-understand.trycloudflare.com';
 
 export function getBaseUrl(): string {
+  // If accessing via PC browser on local development port 5173, connect directly to local backend first
+  if (typeof window !== 'undefined' && window.location) {
+    const port = window.location.port;
+    const hostname = window.location.hostname;
+    if (port === '5173' && (hostname === 'localhost' || hostname === '127.0.0.1')) {
+      return 'http://localhost:8010';
+    }
+  }
+
   try {
     const saved = localStorage.getItem('vera_server_url');
     if (saved && saved.trim()) {
@@ -73,15 +82,6 @@ export function getBaseUrl(): string {
       }
     }
   } catch {}
-
-  // If accessing via PC browser on local development port 5173, connect directly to local backend
-  if (typeof window !== 'undefined' && window.location) {
-    const port = window.location.port;
-    const hostname = window.location.hostname;
-    if (port === '5173' && (hostname === 'localhost' || hostname === '127.0.0.1')) {
-      return 'http://localhost:8010';
-    }
-  }
 
   return DEFAULT_BASE_URL.replace(/\/+$/, '');
 }
@@ -106,7 +106,7 @@ class ApiError extends Error {
   }
 }
 
-async function fetchWithHandle(endpoint: string, options?: RequestInit) {
+async function fetchWithHandle(endpoint: string, options?: RequestInit, retries = 1): Promise<any> {
   const baseUrl = getBaseUrl();
   try {
     const response = await fetch(`${baseUrl}${endpoint}`, {
@@ -120,6 +120,13 @@ async function fetchWithHandle(endpoint: string, options?: RequestInit) {
     return await response.json();
   } catch (error) {
     if (error instanceof ApiError) throw error;
+
+    // Retry transient network drop once with 400ms delay before failing
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 400));
+      return fetchWithHandle(endpoint, options, retries - 1);
+    }
+
     const rawMsg = error instanceof Error ? error.message : 'Unknown network error';
     if (rawMsg.toLowerCase().includes('failed to fetch') || rawMsg.toLowerCase().includes('networkerror')) {
       throw new Error(`Cannot reach VERA server at ${baseUrl}. Ensure backend is running and tunnel is active.`);
