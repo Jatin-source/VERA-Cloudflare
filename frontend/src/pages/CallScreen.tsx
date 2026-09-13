@@ -38,6 +38,7 @@ import {
 import { useVoIP } from '../context/VoIPContext';
 import { CallerLocationMap } from '../components/CallerLocationMap';
 import { api, type VoiceProfile } from '../services/api';
+import { IOSCallScreen } from '../components/IOSCallScreen';
 
 function formatTimer(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -186,6 +187,10 @@ const CallScreen: React.FC = () => {
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [fullTranscript]);
+
+  // iOS vs Cyber view switcher & simulation states
+  const [viewMode, setViewMode] = useState<'ios' | 'cyber'>('ios');
+  const [simulatedCallState, setSimulatedCallState] = useState<'none' | 'incoming' | 'active'>('none');
 
   // Lookup enrolled trusted speaker profile for caller
   const [enrolledProfile, setEnrolledProfile] = useState<VoiceProfile | null>(null);
@@ -339,7 +344,43 @@ const CallScreen: React.FC = () => {
 
       {/* Main Call State Content */}
       {callState === 'IDLE' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          {/* iOS Interface Preview & Switcher Banner */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-blue-950/40 via-[#0d1627] to-indigo-950/40 border border-blue-500/30 p-4 rounded-2xl shadow-lg">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.2)]">
+                <Phone size={20} />
+              </div>
+              <div>
+                <div className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>iOS Call UI & Dynamic Island</span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono font-semibold uppercase">Active</span>
+                </div>
+                <p className="text-xs text-gray-400">
+                  Preview the responsive iOS call interface and morphing Dynamic Island overlay.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSimulatedCallState('incoming')}
+                className="px-3.5 py-2 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white border border-emerald-500/40 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-sm"
+              >
+                <PhoneIncoming size={14} />
+                <span>Preview Incoming</span>
+              </button>
+              <button
+                onClick={() => setSimulatedCallState('active')}
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-md shadow-blue-600/20"
+              >
+                <Phone size={14} />
+                <span>Preview Active</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Dial Card */}
           <div className="bg-[#0a101d] border border-[#1a2333] p-5 md:p-6 rounded-2xl shadow-xl space-y-4">
             <div className="flex items-center space-x-2 text-white font-semibold text-base">
@@ -413,6 +454,7 @@ const CallScreen: React.FC = () => {
             )}
           </div>
         </div>
+        </div>
       )}
 
       {/* OUTGOING RINGING STATE */}
@@ -442,9 +484,60 @@ const CallScreen: React.FC = () => {
         </div>
       )}
 
-      {/* CONNECTED IN-CALL STATE WITH LIVE AI TELEMETRY */}
-      {callState === 'CONNECTED' && (
+      {/* CONNECTED IN-CALL STATE (iOS INTERFACE) */}
+      {callState === 'CONNECTED' && viewMode === 'ios' && (
+        <div className="flex flex-col items-center justify-center py-2 space-y-4">
+          <div className="flex items-center gap-2 bg-[#0d1627] border border-[#1a2333] px-3.5 py-1.5 rounded-full text-xs text-gray-300 shadow-md">
+            <span>View Interface:</span>
+            <button
+              onClick={() => setViewMode('ios')}
+              className="px-3 py-1 rounded-full font-semibold transition-all bg-blue-600 text-white shadow"
+            >
+              📱 iOS Call UI
+            </button>
+            <button
+              onClick={() => setViewMode('cyber')}
+              className="px-3 py-1 rounded-full font-semibold transition-all text-gray-400 hover:text-white"
+            >
+              🛡️ Cyber Telemetry
+            </button>
+          </div>
+          <IOSCallScreen
+            callState="active"
+            callerName={callerReputation?.display_name || peerId || 'Connected Peer'}
+            callerNumber={callerReputation?.caller_id || peerId || '+1 (555) 349-2018'}
+            relationship={enrolledProfile ? `Trusted (${enrolledProfile.relationship || 'Contact'})` : undefined}
+            callDuration={callDuration}
+            onEndCall={endActiveCall}
+            isMuted={isMuted}
+            onToggleMute={toggleMute}
+            isSpeakerOn={isSpeakerOn}
+            onToggleSpeaker={toggleSpeaker}
+            voiceIntegrityScore={veraTelemetry?.voice_integrity_score}
+            aiVoiceProbability={rawAiVoice}
+            overallRiskScore={overallRisk / 100}
+            riskLevel={riskLevel}
+            speakerMatchPercent={speakerSimPercent}
+            isCloneAttack={isCloneAttack}
+            liveLocationText="Mumbai, Maharashtra"
+            transcriptText={fullTranscript}
+            identityClaimText={identityClaim?.has_claim ? `${identityClaim.claimed_entity} (${identityClaim.claimed_role || 'Official'})` : undefined}
+            onOpenFullDossier={() => setViewMode('cyber')}
+          />
+        </div>
+      )}
+
+      {/* CONNECTED IN-CALL STATE (CYBER TELEMETRY VIEW) */}
+      {callState === 'CONNECTED' && viewMode === 'cyber' && (
         <div className="space-y-6 max-w-2xl mx-auto">
+          <div className="flex justify-end">
+            <button
+              onClick={() => setViewMode('ios')}
+              className="px-3.5 py-1.5 bg-[#0d1627] hover:bg-[#121d30] border border-blue-500/40 text-blue-400 hover:text-white text-xs rounded-xl flex items-center gap-1.5 transition-all shadow"
+            >
+              <span>📱 Switch to iOS Call Screen</span>
+            </button>
+          </div>
           {/* CRITICAL SECURITY THREAT ALERT BANNER */}
           {isHighThreat && (
             <div className="bg-rose-950/90 border-2 border-rose-500 p-4 rounded-2xl shadow-[0_0_30px_rgba(244,63,94,0.4)] flex items-start space-x-3 animate-pulse">
@@ -965,8 +1058,42 @@ const CallScreen: React.FC = () => {
         </div>
       )}
 
-      {/* INCOMING CALL MODAL / OVERLAY WITH CENTRAL THREAT REPUTATION */}
-      {callState === 'INCOMING_RINGING' && incomingCallData && (() => {
+      {/* INCOMING CALL MODAL (iOS INTERFACE) */}
+      {callState === 'INCOMING_RINGING' && incomingCallData && viewMode === 'ios' && (() => {
+        const rep = incomingCallData.reputation || callerReputation;
+        return (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+            <div className="relative">
+              <div className="absolute top-2 right-2 z-[70]">
+                <button
+                  onClick={() => setViewMode('cyber')}
+                  className="text-[11px] bg-black/70 hover:bg-black text-gray-300 hover:text-white px-3 py-1 rounded-full border border-white/20 font-mono shadow-lg transition-all"
+                >
+                  Switch to Cyber Alert 🛡️
+                </button>
+              </div>
+              <IOSCallScreen
+                callState="incoming"
+                callerName={rep?.display_name || incomingCallData.caller_id}
+                callerNumber={rep?.caller_id || incomingCallData.caller_id}
+                relationship={enrolledProfile ? `Trusted (${enrolledProfile.relationship || 'Contact'})` : (rep?.category === 'VERIFIED_USER' ? 'Verified Caller' : undefined)}
+                onAnswer={acceptIncomingCall}
+                onDecline={() => rejectIncomingCall('declined')}
+                overallRiskScore={rep?.trust_score ? (100 - rep.trust_score) / 100 : 0.05}
+                riskLevel={rep?.category === 'FRAUD_CONFIRMED' ? 'critical' : rep?.category === 'SCAM_SUSPECTED' ? 'high' : 'low'}
+                speakerMatchPercent={enrolledProfile ? 98 : null}
+                isCloneAttack={false}
+                liveLocationText="Mumbai, Maharashtra"
+                identityClaimText={rep?.threat_tags?.join(', ')}
+                onOpenFullDossier={() => setViewMode('cyber')}
+              />
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* INCOMING CALL MODAL / OVERLAY WITH CENTRAL THREAT REPUTATION (CYBER VIEW) */}
+      {callState === 'INCOMING_RINGING' && incomingCallData && viewMode === 'cyber' && (() => {
         const rep = incomingCallData.reputation || callerReputation;
         const isFraud = rep?.category === 'FRAUD_CONFIRMED';
         const isScam = rep?.category === 'SCAM_SUSPECTED';
@@ -1331,6 +1458,64 @@ const CallScreen: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* INTERACTIVE iOS CALL SIMULATION OVERLAY */}
+      {simulatedCallState !== 'none' && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="mb-3 flex items-center gap-3 bg-[#0d1627] border border-[#1a2333] px-4 py-2 rounded-2xl text-xs text-white shadow-xl">
+            <span className="font-bold text-amber-400 flex items-center gap-1">
+              <span>⚡ iOS Call Screen Simulation</span>
+            </span>
+            <div className="flex items-center gap-1.5 border-l border-gray-700 pl-3">
+              <button
+                onClick={() => setSimulatedCallState('incoming')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  simulatedCallState === 'incoming' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                Incoming Call
+              </button>
+              <button
+                onClick={() => setSimulatedCallState('active')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  simulatedCallState === 'active' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                }`}
+              >
+                Active Call
+              </button>
+            </div>
+            <button
+              onClick={() => setSimulatedCallState('none')}
+              className="ml-2 p-1 text-gray-400 hover:text-white bg-gray-800/60 hover:bg-gray-700 rounded-lg transition-all"
+              title="Close Simulation"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <IOSCallScreen
+            callState={simulatedCallState}
+            callerName="Sarah Jenkins"
+            callerNumber="+1 (555) 349-2018"
+            relationship="Daughter (Enrolled)"
+            callDuration={42}
+            onAnswer={() => setSimulatedCallState('active')}
+            onDecline={() => setSimulatedCallState('none')}
+            onEndCall={() => setSimulatedCallState('none')}
+            isMuted={false}
+            isSpeakerOn={true}
+            voiceIntegrityScore={0.98}
+            aiVoiceProbability={0.02}
+            overallRiskScore={0.05}
+            riskLevel="low"
+            speakerMatchPercent={98}
+            isCloneAttack={false}
+            liveLocationText="Mumbai, Maharashtra"
+            transcriptText="Hi Dad, I just finished my class and wanted to check if we are still meeting at 6 PM near Bandra?"
+            identityClaimText="Enrolled Speaker Profile (Verified)"
+          />
         </div>
       )}
 
