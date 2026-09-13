@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, 
   Wifi, Battery, ChevronUp, ShieldCheck, 
-  AlertTriangle, MessageSquare, X
+  MessageSquare, X
 } from 'lucide-react';
 import { CallerLocationMap } from './CallerLocationMap';
 
@@ -58,12 +58,13 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
   riskLevel = 'low',
   speakerMatchPercent,
   isCloneAttack = false,
-  liveLocationText = 'Mumbai, Maharashtra',
+  liveLocationText = 'Locating...',
   transcriptText,
   identityClaimText,
   onOpenFullDossier
 }) => {
-  const [isIslandExpanded, setIsIslandExpanded] = useState(false);
+  // Start expanded by default on active call or toggleable
+  const [isIslandExpanded, setIsIslandExpanded] = useState(true);
   const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
 
   // Derive display values
@@ -84,23 +85,23 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
   const isHighThreat = isCloneAttack || riskLevel === 'critical' || riskLevel === 'high' || aiPercent >= 60;
 
   return (
-    <div className="w-full flex items-center justify-center p-0 md:p-6 min-h-screen bg-[#070B14]">
-      {/* PHONE FRAME (Center-aligned on desktop, edge-to-edge on mobile) */}
-      <div className="w-full md:w-[400px] h-[100dvh] md:h-[820px] bg-[#F5F7FA] md:rounded-[48px] md:border-[8px] md:border-[#1E293B] shadow-[0_25px_70px_rgba(0,0,0,0.85)] relative overflow-hidden flex flex-col justify-between select-none">
+    <div className="w-full h-full max-h-screen flex items-center justify-center p-0 md:p-2 bg-[#070B14] overflow-hidden select-none">
+      {/* PHONE FRAME (Center-aligned on desktop, edge-to-edge on mobile, zero scrollbars) */}
+      <div className="w-full max-w-[390px] h-[100dvh] md:h-[min(760px,calc(100vh-16px))] bg-[#F5F7FA] md:rounded-[44px] md:border-[7px] md:border-[#1E293B] shadow-[0_20px_60px_rgba(0,0,0,0.85)] relative overflow-hidden flex flex-col justify-between select-none">
         
         {/* =========================================================================
             LAYER 1: TOP STATUS BAR & DYNAMIC ISLAND CONTAINER (STRICT Z-INDEX z-[60])
             ========================================================================= */}
-        <div className="relative z-[60] w-full px-7 pt-3.5 pb-2 flex justify-between items-center text-slate-800">
+        <div className="relative z-[60] w-full px-6 pt-3 pb-1 flex justify-between items-center text-slate-800">
           {/* iOS Clock */}
-          <span className="text-[14px] font-semibold tracking-tight font-sans">9:41</span>
+          <span className="text-[13px] font-semibold tracking-tight font-sans">9:41</span>
 
-          {/* DYNAMIC ISLAND COMPONENT */}
+          {/* DYNAMIC ISLAND / VERA SECURITY MONITOR COMPONENT (TOP CENTRE & CLICKABLE) */}
           <div 
             className={`absolute left-1/2 -translate-x-1/2 top-2 z-50 transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] ${
               isIslandExpanded 
-                ? 'w-[90%] max-w-[370px] h-auto max-h-[300px] p-3.5 bg-[#0a101d] border border-[#1a2333] rounded-[2rem] shadow-[0_15px_40px_rgba(0,0,0,0.6)] cursor-default' 
-                : `w-[120px] h-8 bg-black rounded-[2rem] flex items-center justify-center cursor-pointer shadow-md hover:scale-105 active:scale-95 ${
+                ? 'w-[92%] max-w-[350px] p-3 sm:p-3.5 bg-[#0a101d] border border-[#1a2333] rounded-[2rem] shadow-[0_15px_40px_rgba(0,0,0,0.7)]' 
+                : `w-[124px] h-8 bg-black rounded-full flex items-center justify-center cursor-pointer shadow-md hover:scale-105 active:scale-95 ${
                     isHighThreat ? 'ring-2 ring-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : ''
                   }`
             }`}
@@ -108,9 +109,9 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
               if (!isIslandExpanded) setIsIslandExpanded(true);
             }}
           >
-            {/* COLLAPSED STATE */}
+            {/* COLLAPSED STATE (Click to expand) */}
             {!isIslandExpanded ? (
-              <div className="flex items-center space-x-3 px-3">
+              <div className="flex items-center space-x-3 px-3 w-full justify-between">
                 {/* Left Indicator Dot */}
                 <span className={`w-2.5 h-2.5 rounded-full ${isHighThreat ? 'bg-red-500 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
                 {/* Center Audio Waveform Bar */}
@@ -123,85 +124,80 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
               </div>
             ) : (
-              /* EXPANDED STATE (VERA Security Monitor) */
-              <div className="w-full flex flex-col gap-1.5 animate-in fade-in duration-200">
-                {/* Island Header */}
-                <div className="flex items-center justify-between border-b border-[#1a2333] pb-1.5">
+              /* EXPANDED STATE (VERA Security Monitor - Click Header to Collapse) */
+              <div className="w-full flex flex-col gap-1.5 animate-in fade-in zoom-in-95 duration-200">
+                {/* Island Header: Clickable to toggle collapse */}
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsIslandExpanded(false);
+                  }}
+                  className="flex items-center justify-between border-b border-[#1a2333] pb-1.5 cursor-pointer group"
+                  title="Click to minimize Dynamic Island"
+                >
                   <div className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${isHighThreat ? 'bg-red-500 animate-ping' : 'bg-cyan-400 animate-pulse'}`} />
+                    <span className={`w-2 h-2 rounded-full ${isHighThreat ? 'bg-red-500 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
                     <span className="text-[11px] font-bold tracking-wider uppercase text-gray-200 font-mono">
-                      VERA Security Monitor
+                      VERA SECURITY MONITOR
                     </span>
                   </div>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsIslandExpanded(false);
-                    }}
-                    className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-[#1a2333] transition-colors"
-                  >
-                    <ChevronUp size={14} />
-                  </button>
+                  <div className="text-gray-400 group-hover:text-white p-0.5 rounded-full transition-colors">
+                    <ChevronUp size={15} />
+                  </div>
                 </div>
 
-                {/* Internal Rows Wrapper */}
+                {/* Metrics Rows */}
                 <div className="flex flex-col gap-1 text-left">
                   {/* Row 1: Voice Integrity */}
-                  <div className="flex justify-between items-center border-b border-[#1a2333] pb-1 pt-0.5">
+                  <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
                     <span className="text-[12px] text-gray-300 font-medium">Voice Integrity</span>
                     <div className="flex flex-col items-end leading-tight">
-                      <span className={`text-[15px] font-bold font-mono ${isCloneAttack || aiPercent >= 60 ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {integrityPercent}%
+                      <span className={`text-[10px] font-semibold ${isCloneAttack || aiPercent >= 60 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {isCloneAttack ? 'CLONE ATTACK' : aiPercent >= 60 ? 'SYNTHETIC RISK' : 'Genuine'}
                       </span>
-                      <span className={`text-[10px] font-medium ${isCloneAttack || aiPercent >= 60 ? 'text-red-400' : 'text-slate-400'}`}>
-                        {isCloneAttack ? 'AI VOICE CLONE' : aiPercent >= 60 ? 'SYNTHETIC RISK' : 'GENUINE HUMAN'}
+                      <span className={`text-[15px] font-bold font-mono ${isCloneAttack || aiPercent >= 60 ? 'text-red-400' : 'text-white'}`}>
+                        {integrityPercent}%
                       </span>
                     </div>
                   </div>
 
                   {/* Row 2: Overall Risk */}
-                  <div className="flex justify-between items-center border-b border-[#1a2333] pb-1 pt-0.5">
-                    <span className="text-[12px] text-gray-300 font-medium">Overall Threat Risk</span>
+                  <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
+                    <span className="text-[12px] text-gray-300 font-medium">Overall Risk</span>
                     <div className="flex flex-col items-end leading-tight">
-                      <span className={`text-[15px] font-bold font-mono ${riskPercent >= 70 ? 'text-red-400' : riskPercent >= 40 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                        {riskPercent}%
-                      </span>
-                      <span className="text-[10px] text-gray-400 uppercase font-mono">
+                      <span className={`text-[10px] font-bold font-mono uppercase ${riskPercent >= 70 ? 'text-red-400' : riskPercent >= 40 ? 'text-amber-400' : 'text-emerald-400'}`}>
                         {riskLevel}
+                      </span>
+                      <span className={`text-[15px] font-bold font-mono ${riskPercent >= 70 ? 'text-red-400' : riskPercent >= 40 ? 'text-amber-400' : 'text-white'}`}>
+                        {riskPercent}%
                       </span>
                     </div>
                   </div>
 
                   {/* Row 3: Live Location */}
-                  <div className="flex justify-between items-center border-b border-[#1a2333] pb-1 pt-0.5">
-                    <span className="text-[12px] text-gray-300 font-medium">Caller Location</span>
+                  <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
+                    <span className="text-[12px] text-gray-300 font-medium">Live Location</span>
                     <div className="flex flex-col items-end leading-tight">
-                      <span className="text-[13px] font-semibold text-white truncate max-w-[180px]">
+                      <span className="text-[13px] font-semibold text-white truncate max-w-[170px]">
                         {liveLocationText}
-                      </span>
-                      <span className="text-[10px] text-cyan-400 font-mono">
-                        Cellular / IP Verified
                       </span>
                     </div>
                   </div>
 
-                  {/* Row 4: Speaker Voiceprint (Optional enrolled) */}
+                  {/* Optional Row 4: Speaker Voiceprint */}
                   {speakerMatchPercent !== undefined && speakerMatchPercent !== null && (
-                    <div className="flex justify-between items-center border-b border-[#1a2333] pb-1 pt-0.5">
-                      <span className="text-[12px] text-gray-300 font-medium">Speaker Voiceprint</span>
+                    <div className="flex justify-between items-center border-b border-[#1a2333]/80 pb-1 pt-0.5">
+                      <span className="text-[12px] text-gray-300 font-medium">Speaker Match</span>
                       <div className="flex flex-col items-end leading-tight">
                         <span className="text-[14px] font-bold font-mono text-cyan-300">
-                          {speakerMatchPercent}% Match
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          {relationship || 'Trusted Contact'}
+                          {speakerMatchPercent}%
                         </span>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Bottom Action Button */}
+                {/* Bottom Action Button: View Security Analysis */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -211,129 +207,139 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
                       setIsDossierModalOpen(true);
                     }
                   }}
-                  className="w-full mt-1.5 h-[38px] rounded-[1rem] border border-[#1a2333] bg-[#111928] hover:bg-[#182338] text-blue-400 text-[12px] font-semibold transition-colors flex items-center justify-center gap-1.5 active:scale-98"
+                  className="w-full mt-1.5 h-[34px] rounded-[1rem] border border-[#1a2333] bg-[#111928] hover:bg-[#182338] text-blue-400 hover:text-blue-300 text-[11px] font-semibold transition-colors flex items-center justify-center gap-1.5 active:scale-98"
                 >
-                  <ShieldCheck size={14} />
-                  <span>VIEW SECURITY ANALYSIS</span>
+                  <span>VIEW SECURITY ANALYSIS →</span>
                 </button>
               </div>
             )}
           </div>
 
           {/* iOS Right Status Icons */}
-          <div className="flex items-center space-x-2 text-slate-800">
-            <span className="text-[10px] font-semibold tracking-tighter">5G</span>
-            <Wifi size={14} strokeWidth={2.5} />
-            <Battery size={16} strokeWidth={2.5} />
+          <div className="flex items-center space-x-1.5 text-slate-800">
+            <span className="text-[9px] font-semibold tracking-tighter">5G</span>
+            <Wifi size={13} strokeWidth={2.5} />
+            <Battery size={15} strokeWidth={2.5} />
           </div>
         </div>
 
         {/* =========================================================================
-            LAYER 2: CALLER INFO & AVATAR (STRICT Z-INDEX z-10)
+            LAYER 2: CALLER INFO & AVATAR & CONTROLS (FITTED, STRICTLY NON-SCROLLABLE)
             ========================================================================= */}
-        <div className="relative z-10 flex flex-col items-center justify-between flex-1 px-6 pt-6 pb-8">
+        <div className="relative z-10 flex-1 flex flex-col items-center justify-between px-5 py-2 overflow-hidden w-full">
+          
           {/* Top Caller Typography */}
-          <div className="text-center w-full">
-            {/* Wi-Fi / VoLTE call subtitle */}
-            <div className="text-slate-500 text-xs sm:text-sm font-medium flex items-center justify-center gap-1.5 mb-2">
-              <Wifi size={13} className="text-slate-400" />
-              <span>Incoming Wi-Fi call: VERA</span>
-            </div>
-
-            {/* Caller Name / Identifier */}
-            <h1 className="text-3xl sm:text-4xl font-semibold text-slate-900 tracking-tight leading-tight mb-1 truncate max-w-[320px] mx-auto">
-              {callerName}
-            </h1>
-
-            {/* Phone Number / Relation Tag */}
-            {callerNumber && (
-              <div className="text-xs text-slate-500 font-mono mb-1">
-                {callerNumber} {relationship ? `(${relationship})` : ''}
+          <div className="text-center w-full min-h-[38px] flex flex-col justify-center">
+            {!isIslandExpanded ? (
+              /* Full Typography when island is collapsed */
+              <div className="animate-in fade-in duration-200">
+                <div className="text-slate-500 text-xs font-medium flex items-center justify-center gap-1 mb-1">
+                  <Wifi size={12} className="text-slate-400" />
+                  <span>Wi-Fi Call: VERA</span>
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight leading-tight mb-0.5 truncate max-w-[280px] mx-auto">
+                  {callerName}
+                </h1>
+                {callerNumber && (
+                  <div className="text-[11px] text-slate-500 font-mono mb-0.5">
+                    {callerNumber} {relationship ? `(${relationship})` : ''}
+                  </div>
+                )}
+                <div className="text-xs font-semibold">
+                  {callState === 'incoming' ? (
+                    <span className="text-slate-500 animate-pulse">Incoming call...</span>
+                  ) : (
+                    <span className="text-emerald-600 font-mono tracking-wider">
+                      {formatTimer(callDuration)}
+                    </span>
+                  )}
+                </div>
               </div>
-            )}
-
-            {/* Call State Subtext / Timer */}
-            <div className="text-sm font-medium">
-              {callState === 'incoming' ? (
-                <span className="text-slate-500 animate-pulse">Incoming call...</span>
-              ) : (
-                <span className="text-emerald-600 font-mono font-semibold tracking-wider">
-                  {formatTimer(callDuration)}
-                </span>
-              )}
-            </div>
-
-            {/* High Threat In-Call Indicator */}
-            {isHighThreat && callState === 'active' && (
-              <div className="mt-2.5 mx-auto inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-600 text-xs font-semibold animate-pulse">
-                <AlertTriangle size={13} />
-                <span>Deepfake Anomaly Detected</span>
+            ) : (
+              /* Compact Caller Chip when island is expanded */
+              <div className="pt-1 animate-in fade-in duration-200">
+                <div className="inline-flex items-center gap-2 bg-slate-200/60 border border-slate-300/60 px-3 py-1 rounded-full text-xs font-semibold text-slate-800">
+                  <span className="truncate max-w-[160px]">{callerName}</span>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-[11px] font-mono text-emerald-600">
+                    {callState === 'active' ? formatTimer(callDuration) : 'Incoming...'}
+                  </span>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Large iOS Silhouette Avatar */}
-          <div className="mt-6 mb-8 flex items-center justify-center">
-            <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full bg-gradient-to-b from-[#e2e8f0] to-[#cbd5e1] shadow-inner flex flex-col items-center justify-end overflow-hidden border-2 border-white/60">
+          {/* Large iOS Silhouette Avatar (Responsive clamp scaling to fit perfectly) */}
+          <div className="my-auto flex items-center justify-center py-2">
+            <div className="w-[clamp(110px,18vh,160px)] h-[clamp(110px,18vh,160px)] rounded-full bg-gradient-to-b from-[#e2e8f0] to-[#cbd5e1] shadow-inner flex flex-col items-center justify-end overflow-hidden border-2 border-white/70">
               {/* Silhouette Head */}
-              <div className="w-16 h-16 rounded-full bg-[#94a3b8] mb-1.5 shadow-sm" />
+              <div className="w-[clamp(44px,7vh,64px)] h-[clamp(44px,7vh,64px)] rounded-full bg-[#94a3b8] mb-1 shadow-sm" />
               {/* Silhouette Shoulders */}
-              <div className="w-32 h-16 rounded-t-full bg-[#94a3b8]" />
+              <div className="w-[clamp(88px,14vh,128px)] h-[clamp(44px,7vh,64px)] rounded-t-full bg-[#94a3b8]" />
             </div>
           </div>
 
           {/* =========================================================================
-              LAYER 3: BOTTOM CALL CONTROLS
+              LAYER 3: BOTTOM CALL CONTROLS CARD (EXACT REPLICATION FROM SCREENSHOT)
               ========================================================================= */}
-          <div className="w-full">
+          <div className="w-full pb-3">
             {callState === 'incoming' ? (
               /* INCOMING CALL CONTROLS */
-              <div className="flex flex-col items-center w-full max-w-[320px] mx-auto space-y-4">
+              <div className="w-full max-w-[330px] mx-auto flex flex-col items-center gap-3">
                 {/* Message Quick Action Pill */}
                 <button 
                   type="button"
-                  className="bg-white/90 hover:bg-white text-slate-700 text-xs font-semibold py-2 px-5 rounded-full shadow-sm border border-slate-200/80 flex items-center gap-2 transition-all active:scale-95"
+                  className="bg-white/90 hover:bg-white text-slate-700 text-xs font-semibold py-1.5 px-4 rounded-full shadow-sm border border-slate-200/80 flex items-center gap-1.5 transition-all active:scale-95"
                 >
                   <MessageSquare size={13} className="text-slate-500" />
                   <span>Message</span>
                 </button>
 
-                {/* Frosted Action Pill: Decline (Left) & Answer (Right) */}
-                <div className="w-full bg-white/80 backdrop-blur-md rounded-full p-2 pl-6 pr-2 flex items-center justify-between border border-slate-200/80 shadow-lg">
-                  <button
-                    onClick={onDecline}
-                    className="text-slate-600 hover:text-red-500 text-sm font-semibold transition-colors flex items-center gap-1.5"
-                  >
-                    <span>Decline</span>
-                  </button>
+                {/* Frosted Action Card: Decline (Left) & Answer (Right) */}
+                <div className="w-full bg-[#edf2f7]/85 backdrop-blur-md rounded-[2.2rem] p-3.5 sm:p-4 border border-slate-200/60 shadow-sm flex items-center justify-around">
+                  {/* Decline */}
+                  <div className="flex flex-col items-center">
+                    <button
+                      onClick={onDecline}
+                      className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#EF4444] hover:bg-[#DC2626] text-white flex items-center justify-center shadow-lg shadow-red-500/30 transition-all active:scale-95 hover:scale-105"
+                      title="Decline Call"
+                    >
+                      <PhoneOff size={22} />
+                    </button>
+                    <span className="text-[11px] font-medium text-slate-600 mt-1">Decline</span>
+                  </div>
 
-                  <button
-                    onClick={onAnswer}
-                    className="w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 transition-all transform hover:scale-105 active:scale-95"
-                    title="Answer Call"
-                  >
-                    <Phone size={24} className="fill-white" />
-                  </button>
+                  {/* Answer */}
+                  <div className="flex flex-col items-center">
+                    <button
+                      onClick={onAnswer}
+                      className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 transition-all active:scale-95 hover:scale-105"
+                      title="Answer Call"
+                    >
+                      <Phone size={22} className="fill-white" />
+                    </button>
+                    <span className="text-[11px] font-medium text-slate-600 mt-1">Answer</span>
+                  </div>
                 </div>
               </div>
             ) : (
-              /* ACTIVE CALL CONTROLS */
-              <div className="flex flex-col items-center w-full space-y-6">
-                {/* Secondary In-Call Actions */}
-                <div className="flex items-center justify-center gap-10">
+              /* ACTIVE CALL CONTROLS (MATCHES USER SCREENSHOT) */
+              <div className="w-full max-w-[330px] mx-auto bg-[#edf2f7]/85 backdrop-blur-md rounded-[2.2rem] p-3.5 sm:p-4 border border-slate-200/60 shadow-sm flex flex-col items-center gap-3">
+                {/* Secondary Actions: Mute & Speaker */}
+                <div className="flex items-center justify-center gap-12 w-full">
                   {/* Mute Button */}
                   <div className="flex flex-col items-center">
                     <button
                       onClick={onToggleMute}
-                      className={`w-16 h-16 rounded-full shadow-md flex items-center justify-center transition-all active:scale-95 ${
+                      className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full shadow-sm flex items-center justify-center transition-all active:scale-95 ${
                         isMuted 
-                          ? 'bg-slate-800 text-white shadow-slate-900/20' 
-                          : 'bg-white hover:bg-slate-100 text-slate-800'
+                          ? 'bg-slate-800 text-white' 
+                          : 'bg-white hover:bg-slate-50 text-slate-800'
                       }`}
                     >
-                      {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+                      {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
                     </button>
-                    <span className="text-[11px] font-medium text-slate-600 mt-1.5">
+                    <span className="text-[11px] font-medium text-slate-600 mt-1">
                       {isMuted ? 'Muted' : 'Mute'}
                     </span>
                   </div>
@@ -342,27 +348,27 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
                   <div className="flex flex-col items-center">
                     <button
                       onClick={onToggleSpeaker}
-                      className={`w-16 h-16 rounded-full shadow-md flex items-center justify-center transition-all active:scale-95 ${
+                      className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full shadow-sm flex items-center justify-center transition-all active:scale-95 ${
                         isSpeakerOn 
-                          ? 'bg-slate-800 text-white shadow-slate-900/20' 
-                          : 'bg-white hover:bg-slate-100 text-slate-800'
+                          ? 'bg-slate-800 text-white' 
+                          : 'bg-white hover:bg-slate-50 text-slate-800'
                       }`}
                     >
-                      {isSpeakerOn ? <Volume2 size={24} /> : <VolumeX size={24} />}
+                      {isSpeakerOn ? <Volume2 size={22} /> : <VolumeX size={22} />}
                     </button>
-                    <span className="text-[11px] font-medium text-slate-600 mt-1.5">
+                    <span className="text-[11px] font-medium text-slate-600 mt-1">
                       {isSpeakerOn ? 'Speaker' : 'Audio'}
                     </span>
                   </div>
                 </div>
 
-                {/* End Call Button */}
+                {/* Big Red Circular End Call Button */}
                 <button
                   onClick={onEndCall}
-                  className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-xl shadow-rose-600/35 transition-all transform hover:scale-105 active:scale-95 mx-auto"
+                  className="w-14 h-14 sm:w-15 sm:h-15 rounded-full bg-[#EF4444] hover:bg-[#DC2626] text-white flex items-center justify-center shadow-lg shadow-red-500/40 transition-all transform hover:scale-105 active:scale-95"
                   title="End Call"
                 >
-                  <PhoneOff size={30} className="fill-white" />
+                  <PhoneOff size={24} className="fill-white" />
                 </button>
               </div>
             )}
@@ -374,7 +380,7 @@ export const IOSCallScreen: React.FC<IOSCallScreenProps> = ({
           SECURITY AUDIT TRAY / MODAL (Triggered by "VIEW SECURITY ANALYSIS")
           ========================================================================= */}
       {isDossierModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-[#0A101D] border border-[#1E293B] rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
               <div className="flex items-center gap-2 text-white font-bold text-base">

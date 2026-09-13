@@ -484,22 +484,16 @@ const CallScreen: React.FC = () => {
         </div>
       )}
 
-      {/* CONNECTED IN-CALL STATE (iOS INTERFACE) */}
+      {/* CONNECTED IN-CALL STATE (iOS INTERFACE - FITTED NON-SCROLLABLE) */}
       {callState === 'CONNECTED' && viewMode === 'ios' && (
-        <div className="flex flex-col items-center justify-center py-2 space-y-4">
-          <div className="flex items-center gap-2 bg-[#0d1627] border border-[#1a2333] px-3.5 py-1.5 rounded-full text-xs text-gray-300 shadow-md">
-            <span>View Interface:</span>
-            <button
-              onClick={() => setViewMode('ios')}
-              className="px-3 py-1 rounded-full font-semibold transition-all bg-blue-600 text-white shadow"
-            >
-              📱 iOS Call UI
-            </button>
+        <div className="fixed inset-0 z-50 bg-[#070B14] flex items-center justify-center overflow-hidden select-none">
+          {/* Floating Switcher in Top Right */}
+          <div className="absolute top-3 right-3 z-[80]">
             <button
               onClick={() => setViewMode('cyber')}
-              className="px-3 py-1 rounded-full font-semibold transition-all text-gray-400 hover:text-white"
+              className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-[#0d1627]/90 hover:bg-[#121d30] border border-blue-500/40 text-blue-400 hover:text-white shadow-xl flex items-center gap-1.5 backdrop-blur-md transition-all"
             >
-              🛡️ Cyber Telemetry
+              <span>🛡️ Switch to Cyber Telemetry</span>
             </button>
           </div>
           <IOSCallScreen
@@ -1058,36 +1052,34 @@ const CallScreen: React.FC = () => {
         </div>
       )}
 
-      {/* INCOMING CALL MODAL (iOS INTERFACE) */}
+      {/* INCOMING CALL MODAL (iOS INTERFACE - FITTED NON-SCROLLABLE) */}
       {callState === 'INCOMING_RINGING' && incomingCallData && viewMode === 'ios' && (() => {
         const rep = incomingCallData.reputation || callerReputation;
         return (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-            <div className="relative">
-              <div className="absolute top-2 right-2 z-[70]">
-                <button
-                  onClick={() => setViewMode('cyber')}
-                  className="text-[11px] bg-black/70 hover:bg-black text-gray-300 hover:text-white px-3 py-1 rounded-full border border-white/20 font-mono shadow-lg transition-all"
-                >
-                  Switch to Cyber Alert 🛡️
-                </button>
-              </div>
-              <IOSCallScreen
-                callState="incoming"
-                callerName={rep?.display_name || incomingCallData.caller_id}
-                callerNumber={rep?.caller_id || incomingCallData.caller_id}
-                relationship={enrolledProfile ? `Trusted (${enrolledProfile.relationship || 'Contact'})` : (rep?.category === 'VERIFIED_USER' ? 'Verified Caller' : undefined)}
-                onAnswer={acceptIncomingCall}
-                onDecline={() => rejectIncomingCall('declined')}
-                overallRiskScore={rep?.trust_score ? (100 - rep.trust_score) / 100 : 0.05}
-                riskLevel={rep?.category === 'FRAUD_CONFIRMED' ? 'critical' : rep?.category === 'SCAM_SUSPECTED' ? 'high' : 'low'}
-                speakerMatchPercent={enrolledProfile ? 98 : null}
-                isCloneAttack={false}
-                liveLocationText="Mumbai, Maharashtra"
-                identityClaimText={rep?.threat_tags?.join(', ')}
-                onOpenFullDossier={() => setViewMode('cyber')}
-              />
+          <div className="fixed inset-0 bg-[#070B14] z-50 flex items-center justify-center overflow-hidden select-none">
+            <div className="absolute top-3 right-3 z-[80]">
+              <button
+                onClick={() => setViewMode('cyber')}
+                className="text-[11px] bg-[#0d1627]/90 hover:bg-[#121d30] text-gray-300 hover:text-white px-3.5 py-1.5 rounded-full border border-white/20 font-mono shadow-xl transition-all"
+              >
+                Switch to Cyber Alert 🛡️
+              </button>
             </div>
+            <IOSCallScreen
+              callState="incoming"
+              callerName={rep?.display_name || incomingCallData.caller_id}
+              callerNumber={rep?.caller_id || incomingCallData.caller_id}
+              relationship={enrolledProfile ? `Trusted (${enrolledProfile.relationship || 'Contact'})` : (rep?.category === 'VERIFIED_USER' ? 'Verified Caller' : undefined)}
+              onAnswer={acceptIncomingCall}
+              onDecline={() => rejectIncomingCall('declined')}
+              overallRiskScore={rep?.trust_score ? (100 - rep.trust_score) / 100 : 0.05}
+              riskLevel={rep?.category === 'FRAUD_CONFIRMED' ? 'critical' : rep?.category === 'SCAM_SUSPECTED' ? 'high' : 'low'}
+              speakerMatchPercent={enrolledProfile ? 98 : null}
+              isCloneAttack={false}
+              liveLocationText="Mumbai, Maharashtra"
+              identityClaimText={rep?.threat_tags?.join(', ')}
+              onOpenFullDossier={() => setViewMode('cyber')}
+            />
           </div>
         );
       })()}
@@ -1461,37 +1453,38 @@ const CallScreen: React.FC = () => {
         </div>
       )}
 
-      {/* INTERACTIVE iOS CALL SIMULATION OVERLAY */}
+      {/* INTERACTIVE iOS CALL SIMULATION OVERLAY (FITTED NON-SCROLLABLE) */}
       {simulatedCallState !== 'none' && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex flex-col items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="mb-3 flex items-center gap-3 bg-[#0d1627] border border-[#1a2333] px-4 py-2 rounded-2xl text-xs text-white shadow-xl">
+        <div className="fixed inset-0 bg-[#070B14] z-[100] flex items-center justify-center overflow-hidden select-none">
+          {/* Floating Simulation Control Pill */}
+          <div className="absolute top-3 right-3 z-[80] flex items-center gap-2 bg-[#0d1627]/90 backdrop-blur-md border border-[#1a2333] px-3 py-1.5 rounded-full text-xs text-white shadow-2xl">
             <span className="font-bold text-amber-400 flex items-center gap-1">
-              <span>⚡ iOS Call Screen Simulation</span>
+              <span>⚡ Simulation:</span>
             </span>
-            <div className="flex items-center gap-1.5 border-l border-gray-700 pl-3">
+            <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
               <button
                 onClick={() => setSimulatedCallState('incoming')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
                   simulatedCallState === 'incoming' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
               >
-                Incoming Call
+                Incoming
               </button>
               <button
                 onClick={() => setSimulatedCallState('active')}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all ${
                   simulatedCallState === 'active' ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                 }`}
               >
-                Active Call
+                Active
               </button>
             </div>
             <button
               onClick={() => setSimulatedCallState('none')}
-              className="ml-2 p-1 text-gray-400 hover:text-white bg-gray-800/60 hover:bg-gray-700 rounded-lg transition-all"
+              className="ml-1 p-1 text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-700 rounded-full transition-all"
               title="Close Simulation"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           </div>
 
@@ -1499,20 +1492,20 @@ const CallScreen: React.FC = () => {
             callState={simulatedCallState}
             callerName="Sarah Jenkins"
             callerNumber="+1 (555) 349-2018"
-            relationship="Daughter (Enrolled)"
+            relationship="Daughter"
             callDuration={42}
             onAnswer={() => setSimulatedCallState('active')}
             onDecline={() => setSimulatedCallState('none')}
             onEndCall={() => setSimulatedCallState('none')}
             isMuted={false}
             isSpeakerOn={true}
-            voiceIntegrityScore={0.98}
-            aiVoiceProbability={0.02}
-            overallRiskScore={0.05}
-            riskLevel="low"
+            voiceIntegrityScore={1.0}
+            aiVoiceProbability={0.0}
+            overallRiskScore={0.90}
+            riskLevel="critical"
             speakerMatchPercent={98}
             isCloneAttack={false}
-            liveLocationText="Mumbai, Maharashtra"
+            liveLocationText="Locating..."
             transcriptText="Hi Dad, I just finished my class and wanted to check if we are still meeting at 6 PM near Bandra?"
             identityClaimText="Enrolled Speaker Profile (Verified)"
           />
