@@ -34,6 +34,7 @@ import {
   Check
 } from 'lucide-react';
 import { useVoIPSignaling } from '../hooks/useVoIPSignaling';
+import { CallerLocationMap } from '../components/CallerLocationMap';
 
 function formatTimer(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -580,6 +581,9 @@ const CallScreen: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* CALLER GEOLOCATION MINI MAP (UI MOCKUP) */}
+          <CallerLocationMap callerName={peerId} />
 
           {/* MILESTONE 6: REAL-TIME AI TELEMETRY DASHBOARD */}
           <div className="bg-[#0a101d] border border-[#1a2333] p-5 md:p-6 rounded-3xl shadow-xl space-y-4">

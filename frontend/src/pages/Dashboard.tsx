@@ -17,6 +17,7 @@ import {
 import { api, type SessionResponse, type EvidenceResponse } from '../services/api';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useLiveDetection } from '../hooks/useLiveDetection';
+import { CallerLocationMap } from '../components/CallerLocationMap';
 
 interface BatchRiskResult {
   overall_risk_score: number;
@@ -368,6 +369,13 @@ const Dashboard: React.FC = () => {
           <div className="mb-6 p-4 bg-red-900/20 border border-red-900/50 rounded-xl flex items-center text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
             <AlertTriangle size={18} className="mr-3 shrink-0" />
             <span className="text-sm">{error || liveError || recorderError || decisionError}</span>
+          </div>
+        )}
+
+        {/* Live Caller Location Map (Shown Only During Active Live Call / Live Session) */}
+        {connectionState === 'Live' && (
+          <div className="mb-6">
+            <CallerLocationMap callerName={activeSession?.caller_id || 'Remote Caller'} />
           </div>
         )}
 
