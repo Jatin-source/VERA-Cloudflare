@@ -64,9 +64,10 @@ async def websocket_endpoint(
         "raw_claim_text": None,
         "signals": []
     }
+    session_counted_in_rep = False
     
     async def process_audio_payload(audio_bytes: bytes, chunk_id: Optional[int] = None):
-        nonlocal current_max_risk, audio_history, last_smooth_ai_prob, transcript_history, last_identity_claim
+        nonlocal current_max_risk, audio_history, last_smooth_ai_prob, transcript_history, last_identity_claim, session_counted_in_rep
         temp_audio_path = None
         try:
             if not audio_bytes or len(audio_bytes) < 4000:
@@ -203,13 +204,16 @@ async def websocket_endpoint(
                 if db_sess and db_sess.caller_id:
                     from app.services import reputation_service
                     has_spoof = (voice_result.get("ai_voice_probability") or 0.0) >= 0.65
+                    is_new = not session_counted_in_rep
+                    session_counted_in_rep = True
                     reputation_service.record_session_outcome(
                         db=db,
                         caller_id=db_sess.caller_id,
                         risk_level=reported_risk_level,
                         decision=policy_result.get("decision", "ALLOW"),
                         signals=risk_result.get("contributing_signals", []),
-                        has_voice_spoof=has_spoof
+                        has_voice_spoof=has_spoof,
+                        is_new_session=is_new
                     )
             except Exception as rep_err:
                 logger.warning(f"Failed to update central reputation ledger: {rep_err}")

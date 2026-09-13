@@ -35,7 +35,7 @@ import {
   UserCheck,
   Shield
 } from 'lucide-react';
-import { useVoIPSignaling } from '../hooks/useVoIPSignaling';
+import { useVoIP } from '../context/VoIPContext';
 import { CallerLocationMap } from '../components/CallerLocationMap';
 
 function formatTimer(seconds: number): string {
@@ -169,7 +169,7 @@ const CallScreen: React.FC = () => {
     toggleSpeaker,
     isTouchLocked,
     toggleTouchLock,
-  } = useVoIPSignaling();
+  } = useVoIP();
 
   const [targetUser, setTargetUser] = useState('');
   const [isEditingUser, setIsEditingUser] = useState(false);

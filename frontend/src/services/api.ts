@@ -253,6 +253,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' }
     }),
 
+  getReputationList: (limit: number = 50): Promise<CallerReputation[]> =>
+    fetchWithHandle(`/api/v1/reputation?limit=${limit}`, {
+      headers: { 'Content-Type': 'application/json' }
+    }),
+
   reportCaller: (callerId: string, isScam: boolean, tag?: string): Promise<CallerReputation> =>
     fetchWithHandle(`/api/v1/reputation/${encodeURIComponent(callerId)}/report`, {
       method: 'POST',

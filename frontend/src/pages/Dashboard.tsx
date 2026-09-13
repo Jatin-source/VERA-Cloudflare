@@ -1,22 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   ShieldCheck, 
   Mic, 
   Activity, 
   MessageSquareWarning, 
-  AlertOctagon,
-  Loader2,
-  Radio,
-  FileAudio,
-  FileText,
-  Fingerprint,
-  ShieldAlert,
-  AlertTriangle,
-  CheckCircle2
-, Users, } from 'lucide-react';
-import { api, type SessionResponse, type EvidenceResponse } from '../services/api';
+  AlertOctagon, 
+  Loader2, 
+  Radio, 
+  FileAudio, 
+  Fingerprint, 
+  ShieldAlert, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Users,
+  Phone,
+  PhoneOff,
+  RadioTower
+} from 'lucide-react';
+import { api, type SessionResponse, type CallerReputation } from '../services/api';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useLiveDetection } from '../hooks/useLiveDetection';
+import { useVoIP } from '../context/VoIPContext';
 
 interface BatchRiskResult {
   overall_risk_score: number;
@@ -121,6 +126,22 @@ const LiveWaveform: React.FC<{ analyser: AnalyserNode | null; isActive: boolean 
 
 const Dashboard: React.FC = () => {
   
+  const navigate = useNavigate();
+  const { 
+    callState, 
+    incomingCallData, 
+    callerReputation, 
+    acceptIncomingCall, 
+    rejectIncomingCall 
+  } = useVoIP();
+  const [reputationList, setReputationList] = useState<CallerReputation[]>([]);
+
+  useEffect(() => {
+    api.getReputationList(10).then((data) => {
+      if (data && Array.isArray(data)) setReputationList(data);
+    }).catch((e) => console.warn('Failed to load reputation list:', e));
+  }, []);
+
   const [activeSession, setActiveSession] = useState<SessionResponse | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +152,6 @@ const Dashboard: React.FC = () => {
   const [batchRisk, setBatchRisk] = useState<BatchRiskResult | null>(null);
   const [batchDecision, setBatchDecision] = useState<BatchDecisionResult | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
-  const [evidenceData, setEvidenceData] = useState<EvidenceResponse['data'] | null>(null);
 
   const {
     /* isRecording, */
@@ -163,7 +183,6 @@ const Dashboard: React.FC = () => {
     setBatchRisk(null);
     setBatchDecision(null);
     setDecisionError(null);
-    setEvidenceData(null);
     setAnalysisStage('idle');
     clearRecording();
     if (connectionState !== 'Disconnected') stopLiveDetection();
@@ -182,7 +201,6 @@ const Dashboard: React.FC = () => {
     setBatchRisk(null);
     setBatchDecision(null);
     setDecisionError(null);
-    setEvidenceData(null);
     setError(null);
     setAnalysisStage('decoding');
     try {
@@ -224,10 +242,6 @@ const Dashboard: React.FC = () => {
       } catch (decErr) {
         setDecisionError(decErr instanceof Error ? decErr.message : 'Policy decision unavailable.');
       }
-      try {
-        const evidenceRes = await api.generateEvidence(activeSession.session_id, blob);
-        if (evidenceRes?.data) setEvidenceData(evidenceRes.data);
-      } catch {}
       setAnalysisStage('done');
     } catch (unexpectedErr) {
       setError(unexpectedErr instanceof Error ? unexpectedErr.message : 'Unexpected analysis error.');
@@ -311,6 +325,79 @@ const Dashboard: React.FC = () => {
       {/* Main Content Area */}
       <div className="p-4 sm:p-6 overflow-y-auto flex-1">
         
+        {/* Dynamic Incoming Call Threat Banner on Dashboard */}
+        {callState === 'INCOMING_RINGING' && incomingCallData && (() => {
+          const rep = incomingCallData.reputation || callerReputation;
+          const isFraud = rep?.category === 'FRAUD_CONFIRMED';
+          const isScam = rep?.category === 'SCAM_SUSPECTED';
+          const isVerified = rep?.category === 'VERIFIED_USER';
+
+          return (
+            <div className={`mb-6 p-4 md:p-5 rounded-2xl border-2 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-300 ${
+              isFraud
+                ? 'bg-red-950/90 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.4)] text-red-200'
+                : isScam
+                ? 'bg-amber-950/90 border-amber-500 shadow-[0_0_30px_rgba(245,158,11,0.3)] text-amber-200'
+                : isVerified
+                ? 'bg-emerald-950/90 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.3)] text-emerald-200'
+                : 'bg-blue-950/90 border-blue-500 text-blue-200'
+            }`}>
+              <div className="flex items-center space-x-4 w-full sm:w-auto">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold shrink-0 border-2 shadow-lg ${
+                  isFraud ? 'bg-red-900 border-red-400 text-white' :
+                  isVerified ? 'bg-emerald-900 border-emerald-400 text-white' :
+                  isScam ? 'bg-amber-900 border-amber-400 text-white' :
+                  'bg-blue-900 border-blue-400 text-white'
+                }`}>
+                  {isFraud ? <ShieldAlert size={30} className="animate-pulse text-red-300" /> :
+                   isVerified ? <ShieldCheck size={30} className="text-emerald-300" /> :
+                   <Phone size={28} className="animate-bounce text-blue-300" />}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-black/40 border border-white/10">
+                      {isFraud ? '🚨 Fraud History Alert' : isScam ? '⚠️ Scam Suspected' : isVerified ? '🛡️ Verified Caller' : 'Incoming Call'}
+                    </span>
+                    {rep && (
+                      <span className="text-xs font-mono font-bold bg-black/50 px-2 py-0.5 rounded">
+                        {rep.trust_score}% Trust
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-bold text-white mt-1">
+                    {rep?.display_name || incomingCallData.caller_id}
+                  </h3>
+                  <p className="text-xs opacity-90 mt-0.5">
+                    {isFraud
+                      ? `Warning: Caller flagged across network for ${rep?.threat_tags?.slice(0, 2).join(', ') || 'Voice Clone / Impersonation'}.`
+                      : isVerified
+                      ? `Voiceprint biometrically verified across ${rep?.total_calls_analyzed || 1} previous calls.`
+                      : 'Incoming VoIP call. Live forensic monitoring active.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-3 w-full sm:w-auto justify-end">
+                <button
+                  onClick={() => rejectIncomingCall('declined')}
+                  className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow"
+                >
+                  <PhoneOff size={15} /> Decline
+                </button>
+                <button
+                  onClick={async () => {
+                    await acceptIncomingCall();
+                    navigate('/call');
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 animate-pulse"
+                >
+                  <Phone size={15} /> Answer & View Live
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Welcome & Controls */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4 sm:mb-6">
           <div>
@@ -676,50 +763,76 @@ const Dashboard: React.FC = () => {
         {/* Bottom Row */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-4">
           
-          {/* Recent Evidence */}
+          {/* Central Caller Reputation & Threat Intelligence Feed */}
           <div className="col-span-1 md:col-span-6 bg-[#0a101d] border border-[#1a2333] rounded-xl p-5 shadow-lg">
             <div className="flex justify-between items-center mb-4 border-b border-[#1a2333] pb-3">
               <div className="flex items-center text-gray-300 font-semibold text-sm">
-                <FileText size={16} className="text-gray-400 mr-2" />
-                Recent Evidence
+                <RadioTower size={16} className="text-blue-400 mr-2" />
+                Central Caller Reputation & Threat Intel
               </div>
-              <span className="text-xs text-blue-400 cursor-pointer hover:text-blue-300">View All</span>
+              <span 
+                onClick={() => navigate('/sessions')}
+                className="text-xs text-blue-400 cursor-pointer hover:text-blue-300 transition-colors font-medium"
+              >
+                View All Sessions
+              </span>
             </div>
             
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="text-gray-500 text-xs border-b border-[#1a2333]">
-                    <th className="pb-2 font-normal">Session ID</th>
-                    <th className="pb-2 font-normal">Timestamp</th>
-                    <th className="pb-2 font-normal">Decision</th>
-                    <th className="pb-2 font-normal">Risk</th>
-                    <th className="pb-2 font-normal">Evidence Hash</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-[#1a2333]/50">
-                    <td className="py-3 text-gray-300 font-mono text-xs">{activeSession ? activeSession.session_id.substring(0, 18) + '...' : 'a3f7e2c1-9d4b...'}</td>
-                    <td className="py-3 text-gray-400 text-xs">{new Date().toLocaleString()}</td>
-                    <td className="py-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] border ${
-                        displayDecisionData?.decision === 'block' ? 'bg-red-900/20 text-red-500 border-red-900/50' :
-                        displayDecisionData?.decision === 'verify' ? 'bg-orange-900/20 text-orange-500 border-orange-900/50' :
-                        'bg-emerald-900/20 text-emerald-400 border-emerald-900/50'
-                      }`}>
-                        {displayDecisionData?.decision || 'ALLOW'}
-                      </span>
-                    </td>
-                    <td className="py-3 text-gray-300 text-xs font-mono">{displayRiskData?.overall_risk_score != null ? (displayRiskData.overall_risk_score <= 1.0 ? displayRiskData.overall_risk_score * 100 : displayRiskData.overall_risk_score).toFixed(1) + '%' : '12.6%'}</td>
-                    <td className="py-3">
-                      <div className="flex items-center text-gray-400 text-xs font-mono">
-                        {evidenceData ? (evidenceData?.hash || '').substring(0, 16) + '...' : '4f2e9c7a8b6d...'}
-                        <FileText size={12} className="ml-2 cursor-pointer hover:text-white" />
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              {reputationList.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 text-xs">
+                  Connecting to centralized network threat ledger...
+                </div>
+              ) : (
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="text-gray-500 text-xs border-b border-[#1a2333]">
+                      <th className="pb-2 font-normal">Caller</th>
+                      <th className="pb-2 font-normal">Category</th>
+                      <th className="pb-2 font-normal">Trust</th>
+                      <th className="pb-2 font-normal">Threat Tags</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reputationList.slice(0, 5).map((r) => (
+                      <tr key={r.caller_id} className="border-b border-[#1a2333]/50 hover:bg-[#0d1627]/60 transition-colors">
+                        <td className="py-2.5 text-gray-200 font-semibold text-xs">
+                          {r.display_name || r.caller_id}
+                          {r.display_name && r.display_name !== r.caller_id && (
+                            <span className="block text-[10px] font-mono text-gray-500">{r.caller_id}</span>
+                          )}
+                        </td>
+                        <td className="py-2.5">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                            r.category === 'VERIFIED_USER' ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30' :
+                            r.category === 'FRAUD_CONFIRMED' ? 'bg-red-950/60 text-red-400 border-red-500/30' :
+                            r.category === 'SCAM_SUSPECTED' ? 'bg-amber-950/60 text-amber-400 border-amber-500/30' :
+                            'bg-[#121d30] text-gray-300 border-[#1a2333]'
+                          }`}>
+                            {r.category.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-xs font-mono font-bold text-gray-300">
+                          {r.trust_score}%
+                        </td>
+                        <td className="py-2.5">
+                          <div className="flex flex-wrap gap-1">
+                            {r.threat_tags && r.threat_tags.length > 0 ? (
+                              r.threat_tags.slice(0, 2).map((tag, idx) => (
+                                <span key={idx} className="text-[9px] px-1.5 py-0.5 rounded bg-black/40 border border-white/10 font-mono text-gray-300">
+                                  {tag}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[10px] text-gray-500">Clean</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
           

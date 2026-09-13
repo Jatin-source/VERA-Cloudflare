@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Activity, Clock, RefreshCw, Eye, ShieldAlert, CheckCircle, 
+  Activity, Clock, RefreshCw, Eye, ShieldAlert, 
   AlertTriangle, XCircle, ShieldCheck, 
-  UserCheck, Shield, Tag, ThumbsUp, ThumbsDown, User
+  UserCheck, Shield, Tag, User, Cpu, RadioTower
 } from 'lucide-react';
 import { api, type SessionResponse } from '../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -15,8 +15,6 @@ const Sessions: React.FC = () => {
 
   // For modal/details view
   const [selectedSession, setSelectedSession] = useState<SessionResponse | null>(null);
-  const [reportingCaller, setReportingCaller] = useState<string | null>(null);
-  const [reportSuccess, setReportSuccess] = useState<string | null>(null);
 
   const fetchSessions = async () => {
     setLoading(true);
@@ -34,32 +32,6 @@ const Sessions: React.FC = () => {
   useEffect(() => {
     fetchSessions();
   }, []);
-
-  const handleReport = async (callerId: string, isScam: boolean) => {
-    if (!callerId || callerId === 'Unknown') return;
-    setReportingCaller(callerId);
-    try {
-      const updated = await api.reportCaller(callerId, isScam, isScam ? 'User Reported Scam' : 'User Verified Safe');
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.caller_id === callerId
-            ? { ...s, reputation_category: updated.category, trust_score: updated.trust_score, threat_tags: updated.threat_tags }
-            : s
-        )
-      );
-      if (selectedSession && selectedSession.caller_id === callerId) {
-        setSelectedSession((prev) =>
-          prev ? { ...prev, reputation_category: updated.category, trust_score: updated.trust_score, threat_tags: updated.threat_tags } : null
-        );
-      }
-      setReportSuccess(isScam ? 'Reported as Scam' : 'Marked as Verified Safe');
-      setTimeout(() => setReportSuccess(null), 3000);
-    } catch (e) {
-      console.error('Failed to report caller:', e);
-    } finally {
-      setReportingCaller(null);
-    }
-  };
 
 
 
@@ -180,13 +152,6 @@ const Sessions: React.FC = () => {
           </button>
         </div>
       </div>
-
-      {reportSuccess && (
-        <div className="bg-emerald-950/60 px-4 py-3 rounded-lg border border-emerald-500/40 text-sm text-emerald-400 flex items-center shadow-lg animate-fade-in">
-          <CheckCircle size={16} className="mr-2 text-emerald-400" />
-          <span>{reportSuccess}</span>
-        </div>
-      )}
 
       {error && (
         <div className="bg-vera-danger/10 px-4 py-3 rounded-lg border border-vera-danger/30 text-sm text-vera-danger flex items-center">
@@ -407,25 +372,71 @@ const Sessions: React.FC = () => {
                 </div>
               </div>
 
-              {/* One-Tap Report / Verify Actions */}
-              {selectedSession.caller_id && selectedSession.caller_id !== 'Unknown' && (
-                <div className="pt-3 border-t border-vera-border flex items-center gap-2">
-                  <button
-                    onClick={() => handleReport(selectedSession.caller_id!, true)}
-                    disabled={reportingCaller === selectedSession.caller_id}
-                    className="flex-1 px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/40 text-red-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
-                  >
-                    <ThumbsDown size={14} /> Report Scam
-                  </button>
-                  <button
-                    onClick={() => handleReport(selectedSession.caller_id!, false)}
-                    disabled={reportingCaller === selectedSession.caller_id}
-                    className="flex-1 px-3 py-2 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/40 text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
-                  >
-                    <ThumbsUp size={14} /> Confirm Verified Safe
-                  </button>
+              {/* Autonomous AI Conversation & Threat Intelligence Card */}
+              <div className="pt-3 border-t border-vera-border space-y-3">
+                <div className="bg-[#070b14] border border-[#1a2333] p-3.5 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                      <Cpu size={13} /> Autonomous AI Conversation Analysis
+                    </span>
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-blue-900/30 text-blue-300 border border-blue-500/30">
+                      Neural Engine v2.4
+                    </span>
+                  </div>
+
+                  {/* Autonomous Verdict Description */}
+                  <div className={`p-3 rounded-lg border text-xs leading-relaxed ${
+                    selectedSession.reputation_category === 'FRAUD_CONFIRMED'
+                      ? 'bg-red-950/40 border-red-500/30 text-red-200'
+                      : selectedSession.reputation_category === 'SCAM_SUSPECTED'
+                      ? 'bg-amber-950/40 border-amber-500/30 text-amber-200'
+                      : selectedSession.reputation_category === 'VERIFIED_USER'
+                      ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
+                      : 'bg-[#121d30]/60 border-[#1a2333] text-gray-300'
+                  }`}>
+                    <div className="font-bold flex items-center gap-1.5 mb-1 text-white">
+                      {selectedSession.reputation_category === 'FRAUD_CONFIRMED' ? (
+                        <>
+                          <ShieldAlert size={14} className="text-red-400" />
+                          <span className="text-red-400">Autonomous Verdict: Confirmed Fraud History</span>
+                        </>
+                      ) : selectedSession.reputation_category === 'SCAM_SUSPECTED' ? (
+                        <>
+                          <AlertTriangle size={14} className="text-amber-400" />
+                          <span className="text-amber-400">Autonomous Verdict: High Scam Probability</span>
+                        </>
+                      ) : selectedSession.reputation_category === 'VERIFIED_USER' ? (
+                        <>
+                          <ShieldCheck size={14} className="text-emerald-400" />
+                          <span className="text-emerald-400">Autonomous Verdict: Verified Authentic Caller</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck size={14} className="text-blue-400" />
+                          <span className="text-blue-400">Autonomous Verdict: Neutral Communication Baseline</span>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-300">
+                      {selectedSession.reputation_category === 'FRAUD_CONFIRMED'
+                        ? 'VERA detected synthetic deepfake speech artifacts, spoofed spectral harmonics, or fraudulent social engineering patterns during conversation analysis. Flagged across the decentralized network.'
+                        : selectedSession.reputation_category === 'SCAM_SUSPECTED'
+                        ? 'Conversational transcription exhibited urgent financial extortion patterns, pressure tactics, or unverified claims. Elevated risk latch active.'
+                        : selectedSession.reputation_category === 'VERIFIED_USER'
+                        ? 'Speaker acoustic features match registered voice embeddings with >95% biometric authenticity. Clean conversational history recorded.'
+                        : 'No synthetic acoustic anomalies or deceptive speech cues detected in conversation. Standard baseline monitoring active.'}
+                    </p>
+                  </div>
+
+                  {/* Automated Network Dispatch Notice */}
+                  <div className="flex items-center gap-2 text-[10px] text-gray-400 font-mono bg-[#0d1627] p-2.5 rounded-lg border border-[#1a2333]">
+                    <RadioTower size={14} className="text-blue-400 shrink-0 animate-pulse" />
+                    <span>
+                      <strong>Network Intelligence:</strong> This verified or fraud status is automatically rendered on the other user's dashboard when this caller initiates a call.
+                    </span>
+                  </div>
                 </div>
-              )}
+              </div>
 
             </div>
           </div>

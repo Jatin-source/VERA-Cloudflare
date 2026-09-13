@@ -71,11 +71,13 @@ def record_session_outcome(
     decision: str,
     signals: Optional[List[str]] = None,
     has_voice_spoof: bool = False,
-    display_name: Optional[str] = None
+    display_name: Optional[str] = None,
+    is_new_session: bool = True
 ) -> CallerReputationModel:
     rep = get_or_create_reputation(db, caller_id, display_name=display_name)
     
-    rep.total_calls_analyzed = (rep.total_calls_analyzed or 0) + 1
+    if is_new_session:
+        rep.total_calls_analyzed = (rep.total_calls_analyzed or 0) + 1
     rep.last_verdict = decision
     rep.last_call_timestamp = datetime.utcnow()
 

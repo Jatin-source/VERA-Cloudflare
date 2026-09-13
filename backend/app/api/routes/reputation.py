@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.services import reputation_service
 
+from app.db.models import CallerReputationModel
+
 router = APIRouter()
 
 class ReportRequest(BaseModel):
@@ -23,6 +25,14 @@ class ReputationResponse(BaseModel):
     threat_tags: List[str]
     last_verdict: Optional[str] = None
     last_call_timestamp: Optional[str] = None
+
+@router.get("/api/v1/reputation", response_model=List[ReputationResponse])
+def list_caller_reputations(limit: int = 50, db: Session = Depends(get_db)):
+    """
+    Returns list of centralized caller reputations for the live network intelligence feed.
+    """
+    reps = db.query(CallerReputationModel).order_by(CallerReputationModel.last_call_timestamp.desc()).limit(limit).all()
+    return [reputation_service.to_dict(r) for r in reps]
 
 @router.get("/api/v1/reputation/{caller_id}", response_model=ReputationResponse)
 def get_caller_reputation(caller_id: str, db: Session = Depends(get_db)):
