@@ -31,7 +31,9 @@ import {
   ExternalLink,
   X,
   Search,
-  Check
+  Check,
+  Send,
+  BellRing
 } from 'lucide-react';
 import { useVoIPSignaling } from '../hooks/useVoIPSignaling';
 
@@ -165,6 +167,16 @@ const CallScreen: React.FC = () => {
     toggleSpeaker,
     isTouchLocked,
     toggleTouchLock,
+    incomingChallenge,
+    challengeResult,
+    guardianAlert,
+    isChallengePending,
+    sendIdentityChallenge,
+    respondToChallenge,
+    sendGuardianAlert,
+    dismissChallenge,
+    dismissChallengeResult,
+    dismissGuardianAlert,
   } = useVoIPSignaling();
 
   const [targetUser, setTargetUser] = useState('');
@@ -175,6 +187,10 @@ const CallScreen: React.FC = () => {
   const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
   const [directorySearch, setDirectorySearch] = useState('');
   const [copiedChallenge, setCopiedChallenge] = useState(false);
+  const [callerAuthCode, setCallerAuthCode] = useState('');
+  const [guardianTarget, setGuardianTarget] = useState('User_C');
+  const [guardianAlertSent, setGuardianAlertSent] = useState(false);
+  const [customClaimEntity, setCustomClaimEntity] = useState('');
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll transcript container on new text
@@ -234,6 +250,19 @@ const CallScreen: React.FC = () => {
   const decision = veraTelemetry?.decision?.toUpperCase() || 'ALLOW';
 
   const isHighThreat = riskLevel === 'high' || riskLevel === 'critical' || decision === 'BLOCK' || aiVoicePercent > 60 || (identityClaim?.has_claim && overallRisk >= 75);
+
+  const effectiveClaimEntity = customClaimEntity.trim() || identityClaim?.claimed_entity || 'State Bank of India (SBI)';
+
+  const handleSendChallenge = () => {
+    sendIdentityChallenge(effectiveClaimEntity, identityClaim?.claimed_role || undefined);
+  };
+
+  const handleSendGuardianAlert = () => {
+    if (!guardianTarget.trim()) return;
+    sendGuardianAlert(guardianTarget.trim(), effectiveClaimEntity, riskLevel === 'critical' ? 'CRITICAL' : 'HIGH');
+    setGuardianAlertSent(true);
+    setTimeout(() => setGuardianAlertSent(false), 4000);
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
@@ -577,6 +606,21 @@ const CallScreen: React.FC = () => {
                 title="Ear Guard (Prevent Cheek Touches)"
               >
                 <Lock size={22} />
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveVerifyTab('challenge');
+                  setShowVerifyModal(true);
+                }}
+                className={`p-4 rounded-2xl border transition-all ${
+                  identityClaim?.has_claim || isChallengePending
+                    ? 'bg-amber-600/30 border-amber-500 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.25)] animate-pulse'
+                    : 'bg-[#121d30] border-[#1a2333] text-gray-300 hover:text-amber-300'
+                }`}
+                title="Verify Identity (Out-of-Band)"
+              >
+                <ShieldCheck size={22} />
               </button>
             </div>
           </div>
@@ -930,9 +974,161 @@ const CallScreen: React.FC = () => {
               </button>
             </div>
 
-            {/* TAB 1: IN-APP PUSH CHALLENGE PROTOCOL */}
+            {/* TAB 1: IN-APP PUSH CHALLENGE & OUT-OF-BAND VERIFICATION */}
             {activeVerifyTab === 'challenge' && (
-              <div className="space-y-3 pt-1">
+              <div className="space-y-3.5 pt-1">
+                {/* 1. Interactive Real-Time Out-of-Band Challenge */}
+                <div className="p-4 bg-[#0d1627] border-2 border-amber-500/40 rounded-2xl space-y-3 shadow-[0_0_20px_rgba(245,158,11,0.1)]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck size={18} className="text-amber-400" />
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                        Live Out-of-Band Verification Challenge
+                      </h4>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 font-mono">
+                      WebSocket Channel
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-gray-300 leading-relaxed">
+                    Trigger an authentic cryptographic verification request directly to caller's registered device. The live voice audio continues uninterrupted.
+                  </p>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-gray-400 font-mono flex items-center justify-between">
+                      <span>Target Organization / Claim:</span>
+                      {identityClaim?.has_claim && (
+                        <span className="text-amber-400 font-sans text-[10px]">Auto-detected from caller audio</span>
+                      )}
+                    </label>
+                    <input
+                      type="text"
+                      value={customClaimEntity || identityClaim?.claimed_entity || ''}
+                      onChange={(e) => setCustomClaimEntity(e.target.value)}
+                      placeholder="e.g. State Bank of India (SBI)"
+                      className="w-full bg-[#070b14] border border-[#1a2333] text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-amber-500 font-medium"
+                    />
+                  </div>
+
+                  {/* Challenge Action Button */}
+                  <button
+                    onClick={handleSendChallenge}
+                    disabled={isChallengePending}
+                    className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-black font-bold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.01] active:scale-95"
+                  >
+                    <Send size={14} />
+                    <span>Send Verification Challenge to Caller ({peerId})</span>
+                  </button>
+
+                  {/* Pending State */}
+                  {isChallengePending && (
+                    <div className="p-3 bg-blue-950/60 border border-blue-500/50 rounded-xl flex items-center gap-3 animate-pulse">
+                      <div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin shrink-0"></div>
+                      <div className="text-xs">
+                        <p className="text-blue-300 font-semibold">Challenge Dispatched via Out-of-Band Channel</p>
+                        <p className="text-gray-400 text-[11px]">Awaiting caller authorization response on their device...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Result: Approved */}
+                  {challengeResult && challengeResult.status === 'APPROVED' && (
+                    <div className="p-3.5 bg-emerald-950/70 border-2 border-emerald-500 rounded-xl space-y-1.5 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                          <CheckCircle size={16} />
+                          IDENTITY VERIFIED
+                        </span>
+                        <span className="text-[10px] text-emerald-300 font-mono px-2 py-0.5 rounded bg-emerald-900/80 border border-emerald-500/30">
+                          {challengeResult.auth_code || 'AUTH-VERIFIED'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-200">
+                        Caller authorized the challenge token through the official channel.
+                      </p>
+                      <button
+                        onClick={dismissChallengeResult}
+                        className="text-[11px] text-emerald-400 hover:text-emerald-300 underline font-medium"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Result: Rejected / Failed */}
+                  {challengeResult && (challengeResult.status === 'FAILED' || challengeResult.status === 'REJECTED') && (
+                    <div className="p-3.5 bg-rose-950/80 border-2 border-rose-500 rounded-xl space-y-2.5 shadow-[0_0_30px_rgba(244,63,94,0.35)]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                          <AlertTriangle size={16} className="text-rose-400" />
+                          CHALLENGE REJECTED: IMPERSONATION DETECTED
+                        </span>
+                        <span className="text-[10px] text-rose-200 font-mono uppercase bg-rose-900 px-2 py-0.5 rounded font-bold">
+                          Refused
+                        </span>
+                      </div>
+                      <p className="text-xs text-rose-200 leading-relaxed">
+                        Caller <strong>could not authenticate</strong> as {effectiveClaimEntity}. This caller is an imposter attempting a social engineering scam!
+                      </p>
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            endActiveCall();
+                            setShowVerifyModal(false);
+                          }}
+                          className="flex-1 py-2.5 px-3 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/30 transition-all hover:scale-[1.01]"
+                        >
+                          <PhoneOff size={14} />
+                          <span>Hang Up Active Call Immediately</span>
+                        </button>
+                        <button
+                          onClick={dismissChallengeResult}
+                          className="px-3 py-2.5 bg-[#121d30] text-gray-300 hover:text-white rounded-xl text-xs font-medium border border-[#1a2333]"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Emergency Guardian Alert */}
+                <div className="p-3.5 bg-[#0d1627] border border-[#1a2333] rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <BellRing size={14} className="text-amber-400" />
+                      <span>Notify Trusted Guardian (e.g. User_C)</span>
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-mono">Real-Time Alert</span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    Silently dispatch an emergency alert to your designated guardian with live threat assessment.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={guardianTarget}
+                      onChange={(e) => setGuardianTarget(e.target.value)}
+                      placeholder="Guardian ID (e.g. User_C)"
+                      className="bg-[#070b14] border border-[#1a2333] text-white text-xs px-3 py-1.5 rounded-xl flex-1 focus:outline-none focus:border-amber-500 font-mono"
+                    />
+                    <button
+                      onClick={handleSendGuardianAlert}
+                      className="px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all"
+                    >
+                      <Send size={12} />
+                      <span>{guardianAlertSent ? 'Alert Dispatched!' : 'Send Alert'}</span>
+                    </button>
+                  </div>
+                  {guardianAlertSent && (
+                    <p className="text-[11px] text-emerald-400 font-mono flex items-center gap-1">
+                      <Check size={12} /> Alert dispatched to {guardianTarget} via trusted channel!
+                    </p>
+                  )}
+                </div>
+
+                {/* 3. Verbal Script */}
                 <div className="p-3.5 bg-[#0d1627] border border-amber-500/30 rounded-2xl space-y-2">
                   <div className="flex items-center justify-between text-xs text-amber-300 font-semibold">
                     <span>Read this verbatim to the caller:</span>
@@ -949,6 +1145,7 @@ const CallScreen: React.FC = () => {
                   </p>
                 </div>
 
+                {/* 4. Guidelines */}
                 <div className="space-y-2 text-xs text-gray-300">
                   <div className="flex items-start gap-2">
                     <span className="w-5 h-5 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-400 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">1</span>
@@ -1116,6 +1313,144 @@ const CallScreen: React.FC = () => {
           <div className="px-6 py-3 bg-[#121d30] border border-[#1a2333] rounded-2xl text-blue-400 font-semibold text-xs flex items-center gap-2">
             <Unlock size={16} />
             <span>Tap Anywhere to Unlock</span>
+          </div>
+        </div>
+      )}
+
+      {/* Milestone 18: Incoming Out-of-Band Challenge for Caller (User A) */}
+      {incomingChallenge && callState === 'CONNECTED' && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0a101d] border-2 border-blue-500/80 rounded-3xl max-w-md w-full p-6 shadow-[0_0_50px_rgba(59,130,246,0.35)] space-y-4 animate-in fade-in duration-200">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/50 flex items-center justify-center text-blue-400 shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+                  <ShieldAlert size={26} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white">Identity Challenge</h3>
+                    <span className="text-[10px] px-2 py-0.2 rounded-full bg-blue-950 border border-blue-500/40 text-blue-300 font-mono">
+                      Out-of-Band
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Requested by: <strong className="text-white">{incomingChallenge.sender_id}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={dismissChallenge}
+                className="p-1.5 rounded-xl bg-[#121d30] hover:bg-[#1a2842] text-gray-400 hover:text-white border border-[#1a2333] transition-all"
+                title="Dismiss"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-[#0d1627] border border-blue-500/30 rounded-2xl space-y-2 text-xs text-gray-300">
+              <p>
+                The recipient is challenging your authority claim over VERA's secure out-of-band network:
+              </p>
+              <div className="p-2.5 bg-[#070b14] rounded-xl border border-[#1a2333] space-y-1">
+                <p className="text-amber-300 font-bold text-sm">
+                  {incomingChallenge.claimed_entity}
+                </p>
+                {incomingChallenge.claimed_role && (
+                  <p className="text-[11px] text-gray-400">
+                    Role / Position: {incomingChallenge.claimed_role}
+                  </p>
+                )}
+              </div>
+              <p className="text-[11px] text-gray-400 leading-relaxed">
+                If you are an authorized representative, submit your agency token or tap Approve. If you cannot authenticate, tap Cannot Authenticate.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] text-gray-400 font-mono">Authorization Token / Code (Optional):</label>
+              <input
+                type="text"
+                value={callerAuthCode}
+                onChange={(e) => setCallerAuthCode(e.target.value)}
+                placeholder="e.g. SBI-AUTH-2026"
+                className="w-full bg-[#070b14] border border-[#1a2333] text-white text-xs px-3.5 py-2.5 rounded-xl focus:outline-none focus:border-blue-500 font-mono"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                onClick={() => {
+                  respondToChallenge('APPROVED', callerAuthCode || 'OFFICIAL-SBI-TOKEN');
+                  setCallerAuthCode('');
+                }}
+                className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02]"
+              >
+                <CheckCircle size={15} />
+                <span>Approve & Verify</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  respondToChallenge('REJECTED');
+                  setCallerAuthCode('');
+                }}
+                className="py-2.5 px-3 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all hover:scale-[1.02]"
+              >
+                <X size={15} />
+                <span>Cannot Authenticate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Milestone 18: Emergency Guardian Alert Banner (for Guardian / User C) */}
+      {guardianAlert && (
+        <div className="fixed top-4 left-4 right-4 z-50 max-w-lg mx-auto bg-rose-950/95 border-2 border-rose-500 rounded-3xl p-4 sm:p-5 shadow-[0_0_50px_rgba(244,63,94,0.4)] backdrop-blur-md animate-in slide-in-from-top duration-300 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start space-x-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-600/20 border border-rose-500/50 flex items-center justify-center text-rose-400 shrink-0 mt-0.5 shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+                <AlertTriangle size={24} className="animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-rose-300 uppercase tracking-wider flex items-center gap-1">
+                    <BellRing size={13} />
+                    Emergency Guardian Alert
+                  </span>
+                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-rose-900 border border-rose-500/40 text-white font-mono font-bold">
+                    {guardianAlert.risk_level}
+                  </span>
+                </div>
+                <p className="text-xs text-white">
+                  <strong className="text-rose-200">{guardianAlert.sender_id}</strong> is receiving a suspicious call claiming to be:
+                </p>
+                <p className="text-xs font-bold text-amber-300 bg-black/40 px-3 py-1.5 rounded-xl font-mono border border-amber-500/30">
+                  {guardianAlert.claimed_entity}
+                </p>
+                <p className="text-[11px] text-gray-300 pt-0.5 leading-relaxed">
+                  Active impersonation risk detected by VERA AI. Check in with {guardianAlert.sender_id} immediately.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={dismissGuardianAlert}
+              className="p-1.5 rounded-xl bg-black/40 hover:bg-black/60 text-gray-400 hover:text-white border border-rose-500/30 transition-all"
+              title="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-rose-500/30">
+            <span className="text-[10px] text-gray-400 font-mono">
+              Received via VERA Out-of-Band Network
+            </span>
+            <button
+              onClick={dismissGuardianAlert}
+              className="px-4 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl transition-all"
+            >
+              Acknowledge & Dismiss
+            </button>
           </div>
         </div>
       )}

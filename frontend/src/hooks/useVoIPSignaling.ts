@@ -7,6 +7,30 @@ import { veraPipeline, type VeraTelemetry } from '../services/veraPipeline';
 import { deviceAudioService } from '../services/deviceAudio';
 import type { CallState, SignalingMessage } from '../types/voip';
 
+export interface IdentityChallengeRequest {
+  sender_id: string;
+  call_id: string;
+  claimed_entity: string;
+  claimed_role?: string;
+  challenge_id: string;
+  timestamp: number;
+}
+
+export interface IdentityChallengeResult {
+  challenge_id: string;
+  status: 'APPROVED' | 'FAILED' | 'REJECTED';
+  auth_code?: string;
+  timestamp: number;
+}
+
+export interface GuardianAlertData {
+  sender_id: string;
+  claimed_entity: string;
+  risk_level: string;
+  call_id?: string;
+  timestamp: number;
+}
+
 export function useVoIPSignaling() {
   const [currentUser, setCurrentUser] = useState<string>(() => {
     return localStorage.getItem('vera_voip_user') || 'User_A';
@@ -31,6 +55,10 @@ export function useVoIPSignaling() {
   const [detectedSignals, setDetectedSignals] = useState<Array<any>>([]);
   const [isSpeakerOn, setIsSpeakerOn] = useState<boolean>(true);
   const [isTouchLocked, setIsTouchLocked] = useState<boolean>(false);
+  const [incomingChallenge, setIncomingChallenge] = useState<IdentityChallengeRequest | null>(null);
+  const [challengeResult, setChallengeResult] = useState<IdentityChallengeResult | null>(null);
+  const [guardianAlert, setGuardianAlert] = useState<GuardianAlertData | null>(null);
+  const [isChallengePending, setIsChallengePending] = useState<boolean>(false);
 
   const timerRef = useRef<any>(null);
 
@@ -260,6 +288,44 @@ export function useVoIPSignaling() {
             await webrtcManager.handleIceCandidate(msg.candidate);
           }
           break;
+
+        // Milestone 18: Out-of-Band Challenge & Guardian Alerts
+        case 'identity:challenge':
+          if (msg.claimed_entity && msg.sender_id) {
+            setIncomingChallenge({
+              sender_id: msg.sender_id,
+              call_id: msg.call_id || activeCallId || '',
+              claimed_entity: msg.claimed_entity,
+              claimed_role: msg.claimed_role,
+              challenge_id: msg.challenge_id || 'CHAL-' + Date.now(),
+              timestamp: Date.now()
+            });
+          }
+          break;
+
+        case 'identity:response':
+          setIsChallengePending(false);
+          if (msg.status) {
+            setChallengeResult({
+              challenge_id: msg.challenge_id || '',
+              status: msg.status,
+              auth_code: msg.auth_code,
+              timestamp: Date.now()
+            });
+          }
+          break;
+
+        case 'guardian:alert':
+          if (msg.sender_id && msg.claimed_entity) {
+            setGuardianAlert({
+              sender_id: msg.sender_id,
+              claimed_entity: msg.claimed_entity,
+              risk_level: msg.risk_level || 'critical',
+              call_id: msg.call_id,
+              timestamp: Date.now()
+            });
+          }
+          break;
       }
     });
 
@@ -338,6 +404,46 @@ export function useVoIPSignaling() {
     setIsTouchLocked((prev) => !prev);
   }, []);
 
+  // Milestone 18: Out-of-Band Challenge & Guardian Actions
+  const sendIdentityChallenge = useCallback((claimedEntity?: string, claimedRole?: string) => {
+    if (!peerId || !activeCallId) return;
+    const entity = claimedEntity || veraTelemetry?.identity_claim?.claimed_entity || 'Authority Organization';
+    const role = claimedRole || veraTelemetry?.identity_claim?.claimed_role || undefined;
+    setIsChallengePending(true);
+    setChallengeResult(null);
+    signalingService.sendIdentityChallenge(peerId, activeCallId, entity, role);
+  }, [peerId, activeCallId, veraTelemetry]);
+
+  const respondToChallenge = useCallback((status: 'APPROVED' | 'FAILED' | 'REJECTED', authCode?: string) => {
+    if (!incomingChallenge) return;
+    signalingService.sendIdentityResponse(
+      incomingChallenge.sender_id,
+      incomingChallenge.call_id,
+      incomingChallenge.challenge_id,
+      status,
+      authCode
+    );
+    setIncomingChallenge(null);
+  }, [incomingChallenge]);
+
+  const sendGuardianAlert = useCallback((guardianId: string, customEntity?: string, customRisk?: string) => {
+    const entity = customEntity || veraTelemetry?.identity_claim?.claimed_entity || 'Authoritative Institution';
+    const risk = customRisk || veraTelemetry?.risk_level || 'critical';
+    signalingService.sendGuardianAlert(guardianId, entity, risk, activeCallId || undefined);
+  }, [activeCallId, veraTelemetry]);
+
+  const dismissChallenge = useCallback(() => {
+    setIncomingChallenge(null);
+  }, []);
+
+  const dismissChallengeResult = useCallback(() => {
+    setChallengeResult(null);
+  }, []);
+
+  const dismissGuardianAlert = useCallback(() => {
+    setGuardianAlert(null);
+  }, []);
+
   return {
     currentUser,
     switchUser,
@@ -369,5 +475,15 @@ export function useVoIPSignaling() {
     toggleSpeaker,
     isTouchLocked,
     toggleTouchLock,
+    incomingChallenge,
+    challengeResult,
+    guardianAlert,
+    isChallengePending,
+    sendIdentityChallenge,
+    respondToChallenge,
+    sendGuardianAlert,
+    dismissChallenge,
+    dismissChallengeResult,
+    dismissGuardianAlert,
   };
 }
