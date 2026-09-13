@@ -48,7 +48,7 @@ export const CallerLocationMap: React.FC<CallerLocationMapProps> = ({
             <MapPin size={13} />
           </div>
           <span className="text-xs font-semibold text-white tracking-wide">
-            Live Caller Location
+            Live Caller Location {callerName ? `• ${callerName}` : ''}
           </span>
         </div>
         <div className="flex items-center space-x-1.5">
@@ -270,10 +270,15 @@ export const CallerLocationMap: React.FC<CallerLocationMapProps> = ({
         <div className="space-y-1">
           <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
             <Navigation size={11} className="text-blue-400" />
-            <span>Caller Location</span>
+            <span>{callerName ? `${callerName}'s Estimated Location` : 'Caller Location'}</span>
           </div>
-          <div className="text-base font-bold text-white tracking-wide">
-            {location.city}, {location.country}
+          <div className="text-base font-bold text-white tracking-wide flex items-center gap-2">
+            <span>{location.city}, {location.country}</span>
+            {callerName && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-950/80 border border-blue-500/40 text-blue-300 font-medium">
+                {callerName}
+              </span>
+            )}
           </div>
           <div className="text-xs text-gray-400 font-mono flex flex-wrap items-center gap-2">
             {location.area && (

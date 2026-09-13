@@ -583,7 +583,7 @@ const CallScreen: React.FC = () => {
           </div>
 
           {/* CALLER GEOLOCATION MINI MAP (UI MOCKUP) */}
-          <CallerLocationMap callerName={peerId} />
+          <CallerLocationMap callerName={peerId || incomingCallData?.caller_id || (targetUser ? targetUser.trim() : null) || 'Remote Caller'} />
 
           {/* MILESTONE 6: REAL-TIME AI TELEMETRY DASHBOARD */}
           <div className="bg-[#0a101d] border border-[#1a2333] p-5 md:p-6 rounded-3xl shadow-xl space-y-4">
