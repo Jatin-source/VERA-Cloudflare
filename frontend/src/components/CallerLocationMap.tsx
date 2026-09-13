@@ -14,13 +14,13 @@ export interface CallerLocation {
 }
 
 export const DEFAULT_MOCK_LOCATION: CallerLocation = {
-  city: 'New Delhi',
-  state: 'Delhi',
+  city: 'Greater Noida',
+  state: 'Uttar Pradesh',
   country: 'India',
-  area: 'Connaught Place',
-  latitude: 28.6139,
-  longitude: 77.2090,
-  accuracyMeters: 350,
+  area: 'Bennett University (TechZone 2)',
+  latitude: 28.4506,
+  longitude: 77.5842,
+  accuracyMeters: 250,
   provider: 'Cellular Tower Triangulation',
   isMock: true,
 };
@@ -59,7 +59,7 @@ export const CallerLocationMap: React.FC<CallerLocationMapProps> = ({
         </div>
       </div>
 
-      {/* Google Maps Style Vector Geographic Map */}
+      {/* Google Maps Style Vector Geographic Map: Bennett University, Greater Noida */}
       <div className="relative w-full h-44 sm:h-52 bg-[#18202d] overflow-hidden select-none">
         <svg
           viewBox="0 0 400 200"
@@ -73,138 +73,120 @@ export const CallerLocationMap: React.FC<CallerLocationMapProps> = ({
               <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.6" />
             </filter>
             {/* Subtle grid pattern */}
-            <pattern id="cityGrid" width="30" height="30" patternUnits="userSpaceOnUse">
-              <rect width="30" height="30" fill="#18202d" />
-              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1d2737" strokeWidth="0.8" />
+            <pattern id="campusGrid" width="25" height="25" patternUnits="userSpaceOnUse">
+              <rect width="25" height="25" fill="#18202d" />
+              <path d="M 25 0 L 0 0 0 25" fill="none" stroke="#1d2737" strokeWidth="0.7" />
             </pattern>
           </defs>
 
-          {/* Base Urban Terrain Grid */}
-          <rect width="400" height="200" fill="url(#cityGrid)" />
+          {/* Base Terrain Grid */}
+          <rect width="400" height="200" fill="url(#campusGrid)" />
 
-          {/* City Block Polygon Fills */}
-          <polygon points="10,10 70,15 65,55 15,50" fill="#1e2838" />
-          <polygon points="85,15 150,20 140,55 80,50" fill="#1c2534" />
-          <polygon points="260,20 330,15 320,55 255,50" fill="#1e2838" />
-          <polygon points="345,10 395,10 395,60 335,55" fill="#1b2432" />
+          {/* Institutional Sector / TechZone Blocks */}
+          <polygon points="15,15 90,15 85,75 15,70" fill="#1e2838" />
+          <polygon points="15,90 85,95 80,185 15,185" fill="#1c2534" />
+          <polygon points="315,15 385,15 385,75 320,80" fill="#1c2534" />
+          <polygon points="320,105 385,100 385,185 315,185" fill="#1e2838" />
 
-          <polygon points="10,140 70,145 60,190 10,190" fill="#1c2534" />
-          <polygon points="80,150 140,150 135,190 75,190" fill="#1e2838" />
-          <polygon points="260,150 330,145 335,190 265,190" fill="#1c2534" />
-          <polygon points="345,140 395,140 395,190 345,190" fill="#1e2838" />
+          {/* Bennett University Campus Zone (Central Plot) */}
+          <rect x="110" y="30" width="180" height="140" rx="12" fill="#1b2535" stroke="#253549" strokeWidth="1.5" />
 
-          {/* Green Spaces / Parks (Google Maps Sage/Dark Green) */}
-          <path
-            d="M 20 80 Q 45 65 70 85 T 60 125 T 15 115 Z"
-            fill="#122e22"
-            stroke="#184332"
-            strokeWidth="1"
-          />
-          <path
-            d="M 330 80 Q 370 70 385 105 T 350 135 T 320 110 Z"
-            fill="#122e22"
-            stroke="#184332"
-            strokeWidth="1"
-          />
-          {/* Central Park (Inside Connaught Place Inner Circle) */}
-          <circle cx="200" cy="100" r="18" fill="#143628" stroke="#1d4e3a" strokeWidth="1.5" />
-
-          {/* Yamuna River / Waterway Curve in the northeast */}
-          <path
-            d="M 320 -10 Q 350 30 380 40 T 410 70"
-            fill="none"
-            stroke="#142c44"
-            strokeWidth="14"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 320 -10 Q 350 30 380 40 T 410 70"
-            fill="none"
-            stroke="#1c3e62"
-            strokeWidth="10"
-            strokeLinecap="round"
-          />
-          <text x="368" y="28" fill="#3b82f6" fontSize="7" fontStyle="italic" opacity="0.6">
-            Yamuna River
+          {/* Campus Greens & Athletic Sports Complex Fields */}
+          {/* Main Sports Oval / Cricket Ground */}
+          <ellipse cx="245" cy="72" rx="22" ry="16" fill="#143628" stroke="#1d4e3a" strokeWidth="1.5" />
+          <ellipse cx="245" cy="72" rx="6" ry="4" fill="none" stroke="#225b44" strokeWidth="1" />
+          <text x="245" y="74" fill="#86efac" fontSize="5.5" fontWeight="600" textAnchor="middle" opacity="0.85">
+            Sports Oval
           </text>
 
-          {/* Secondary City Streets Grid (Slate gray) */}
+          {/* Campus Quad Lawns & Courtyard */}
+          <rect x="135" y="65" width="38" height="28" rx="4" fill="#122e22" stroke="#184332" strokeWidth="1" />
+          <text x="154" y="81" fill="#86efac" fontSize="5.5" fontWeight="600" textAnchor="middle" opacity="0.85">
+            Campus Quad
+          </text>
+
+          {/* Academic & Administrative Blocks */}
+          <rect x="132" y="110" width="32" height="18" rx="2" fill="#243447" stroke="#32465e" strokeWidth="1" />
+          <text x="148" y="122" fill="#cbd5e1" fontSize="5.5" fontWeight="bold" textAnchor="middle">
+            Block A/B
+          </text>
+
+          <rect x="175" y="112" width="30" height="18" rx="2" fill="#243447" stroke="#32465e" strokeWidth="1" />
+          <text x="190" y="123" fill="#cbd5e1" fontSize="5.5" fontWeight="bold" textAnchor="middle">
+            Block C
+          </text>
+
+          <rect x="220" y="110" width="45" height="18" rx="2" fill="#243447" stroke="#32465e" strokeWidth="1" />
+          <text x="242" y="122" fill="#cbd5e1" fontSize="5.5" fontWeight="bold" textAnchor="middle">
+            Hostels & Mess
+          </text>
+
+          {/* Surrounding Secondary Grid Streets (TechZone 2 Roads) */}
           <g stroke="#28374d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
-            <path d="M 0 35 L 400 35" />
-            <path d="M 0 165 L 400 165" />
-            <path d="M 45 0 L 45 200" />
-            <path d="M 110 0 L 110 200" />
-            <path d="M 290 0 L 290 200" />
-            <path d="M 360 0 L 360 200" />
+            {/* TechZone Internal Roadways */}
+            <path d="M 0 50 L 110 50" />
+            <path d="M 0 150 L 110 150" />
+            <path d="M 290 50 L 400 50" />
+            <path d="M 290 150 L 400 150" />
+            {/* Campus Loop Road */}
+            <rect x="122" y="42" width="156" height="116" rx="8" />
           </g>
 
-          {/* Connaught Place Concentric Circular Roads */}
-          <circle cx="200" cy="100" r="56" fill="none" stroke="#334661" strokeWidth="5" />
-          <circle cx="200" cy="100" r="56" fill="none" stroke="#25354a" strokeWidth="3.5" />
-          <circle cx="200" cy="100" r="38" fill="none" stroke="#28384f" strokeWidth="2.5" />
-          <circle cx="200" cy="100" r="24" fill="none" stroke="#3a4f6d" strokeWidth="3" />
-
-          {/* Major Radial Arterial Highways (Warm Google Maps Orange/Gold) */}
-          <g stroke="#7c4a03" strokeWidth="5" strokeLinecap="round" fill="none">
-            <path d="M 200 124 L 200 205" />
-            <path d="M 200 76 L 200 -5" />
-            <path d="M 224 100 L 405 100" />
-            <path d="M 176 100 L -5 100" />
-            <path d="M 183 117 L 110 190" />
-            <path d="M 217 117 L 290 190" />
-            <path d="M 217 83 L 295 10" />
-            <path d="M 183 83 L 105 10" />
+          {/* MAJOR ARTERIAL HIGHWAY 1: Yamuna Expressway (Diagonal corridor in east) */}
+          <g stroke="#7c4a03" strokeWidth="7" strokeLinecap="round" fill="none">
+            <path d="M 330 -10 L 410 190" />
           </g>
-
-          {/* Primary Road Highway Inner Lines (Bright Yellow/Orange) */}
-          <g stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" fill="none">
-            <path d="M 200 124 L 200 205" />
-            <path d="M 200 76 L 200 -5" />
-            <path d="M 224 100 L 405 100" />
-            <path d="M 176 100 L -5 100" />
-            <path d="M 183 117 L 110 190" />
-            <path d="M 217 117 L 290 190" />
-            <path d="M 217 83 L 295 10" />
-            <path d="M 183 83 L 105 10" />
+          <g stroke="#f59e0b" strokeWidth="4.5" strokeLinecap="round" fill="none">
+            <path d="M 330 -10 L 410 190" />
           </g>
+          {/* Expressway Dashed Center Line */}
+          <path d="M 330 -10 L 410 190" fill="none" stroke="#ffffff" strokeWidth="0.8" strokeDasharray="5 4" opacity="0.7" />
+          <text x="340" y="110" fill="#fde68a" fontSize="7" fontWeight="bold" transform="rotate(68 340 110)">
+            YAMUNA EXPRESSWAY
+          </text>
+
+          {/* MAJOR ARTERIAL HIGHWAY 2: TechZone 2 Main Blvd / Pari Chowk Connector */}
+          <g stroke="#7c4a03" strokeWidth="6" strokeLinecap="round" fill="none">
+            <path d="M -5 100 L 405 100" />
+          </g>
+          <g stroke="#f59e0b" strokeWidth="3.5" strokeLinecap="round" fill="none">
+            <path d="M -5 100 L 405 100" />
+          </g>
+          <text x="50" y="94" fill="#cbd5e1" fontSize="6.5" fontWeight="600">
+            TechZone 2 Blvd
+          </text>
+          <text x="310" y="94" fill="#cbd5e1" fontSize="6" fontWeight="500">
+            To Pari Chowk →
+          </text>
 
           {/* Authentic Geographic Labels */}
-          <text x="200" y="70" fill="#e2e8f0" fontSize="8" fontWeight="700" textAnchor="middle" letterSpacing="0.5">
-            CONNAUGHT PLACE
+          <text x="200" y="58" fill="#ffffff" fontSize="9" fontWeight="800" textAnchor="middle" letterSpacing="0.6">
+            BENNETT UNIVERSITY
           </text>
-          <text x="200" y="103" fill="#86efac" fontSize="6.5" fontWeight="600" textAnchor="middle" opacity="0.85">
-            Central Park
+          <text x="200" y="148" fill="#94a3b8" fontSize="6.5" fontWeight="600" textAnchor="middle">
+            Greater Noida Campus • TechZone 2
           </text>
-          <text x="206" y="155" fill="#cbd5e1" fontSize="6.5" fontWeight="500">
-            Janpath
+          <text x="50" y="30" fill="#64748b" fontSize="6.5" fontWeight="500">
+            Knowledge Park III
           </text>
-          <text x="270" y="96" fill="#cbd5e1" fontSize="6.5" fontWeight="500">
-            Barakhamba Rd
-          </text>
-          <text x="135" y="150" fill="#94a3b8" fontSize="6" fontWeight="500" transform="rotate(-45 135 150)">
-            Sansad Marg
-          </text>
-          <text x="250" y="155" fill="#94a3b8" fontSize="6" fontWeight="500" transform="rotate(45 250 155)">
-            KG Marg
+          <text x="50" y="170" fill="#64748b" fontSize="6.5" fontWeight="500">
+            Institutional Area
           </text>
 
-          {/* Metro Station Nodes (Blue 'M' Badges) */}
-          <g transform="translate(193, 110)">
-            <rect width="14" height="9" rx="2" fill="#2563eb" />
-            <text x="7" y="7" fill="#ffffff" fontSize="6.5" fontWeight="bold" textAnchor="middle">
-              M
+          {/* University Icon / Emblem Node */}
+          <g transform="translate(193, 76)">
+            <circle cx="7" cy="7" r="8" fill="#1e3a8a" stroke="#3b82f6" strokeWidth="1" />
+            <text x="7" y="10" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">
+              U
             </text>
           </g>
-          <text x="210" y="117" fill="#93c5fd" fontSize="5.5" fontWeight="500">
-            Rajiv Chowk
-          </text>
 
-          {/* CALLER LOCATION PIN & RADAR BEACON */}
+          {/* CALLER LOCATION PIN & RADAR BEACON (Anchored at Bennett University Campus) */}
           {/* Signal Accuracy Circle */}
           <circle
             cx="200"
-            cy="98"
-            r="32"
+            cy="92"
+            r="30"
             fill="#ef4444"
             fillOpacity="0.08"
             stroke="#ef4444"
@@ -213,34 +195,34 @@ export const CallerLocationMap: React.FC<CallerLocationMapProps> = ({
           />
 
           {/* Animated Pulsing Signal Beacon */}
-          <circle cx="200" cy="98" r="18" fill="#ef4444" fillOpacity="0.25">
-            <animate attributeName="r" values="10;28;10" dur="2.5s" repeatCount="indefinite" />
+          <circle cx="200" cy="92" r="16" fill="#ef4444" fillOpacity="0.25">
+            <animate attributeName="r" values="10;26;10" dur="2.5s" repeatCount="indefinite" />
             <animate attributeName="fill-opacity" values="0.35;0.05;0.35" dur="2.5s" repeatCount="indefinite" />
           </circle>
 
           {/* Pin Ground Shadow */}
-          <ellipse cx="200" cy="98" rx="7" ry="3" fill="#000000" fillOpacity="0.5" />
+          <ellipse cx="200" cy="92" rx="7" ry="3" fill="#000000" fillOpacity="0.5" />
 
           {/* Pin Ground Target Dot */}
-          <circle cx="200" cy="98" r="2.5" fill="#b91c1c" />
+          <circle cx="200" cy="92" r="2.5" fill="#b91c1c" />
 
           {/* Classic Red Google Maps Pin */}
           <g filter="url(#pinShadow)">
             <path
-              d="M 200 68 
-                 C 192 68 186 74 186 82 
-                 C 186 92.5 200 98 200 98 
-                 C 200 98 214 92.5 214 82 
-                 C 214 74 208 68 200 68 Z"
+              d="M 200 62 
+                 C 192 62 186 68 186 76 
+                 C 186 86.5 200 92 200 92 
+                 C 200 92 214 86.5 214 76 
+                 C 214 68 208 62 200 62 Z"
               fill="#ea4335"
               stroke="#b91c1c"
               strokeWidth="1.2"
               strokeLinejoin="round"
             />
             {/* White Center Dot of Pin */}
-            <circle cx="200" cy="80.5" r="4" fill="#ffffff" />
+            <circle cx="200" cy="74.5" r="4" fill="#ffffff" />
             {/* Inner accent dot */}
-            <circle cx="200" cy="80.5" r="1.8" fill="#ea4335" />
+            <circle cx="200" cy="74.5" r="1.8" fill="#ea4335" />
           </g>
         </svg>
 
@@ -248,7 +230,7 @@ export const CallerLocationMap: React.FC<CallerLocationMapProps> = ({
         <div className="absolute top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg bg-[#070b14]/90 border border-rose-500/50 shadow-xl backdrop-blur-md flex items-center space-x-1.5 pointer-events-none">
           <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
           <span className="text-[11px] font-bold text-white tracking-wide">
-            {callerName ? `${callerName}'s Location` : 'Caller Location'}
+            {callerName ? `${callerName}'s Location` : 'Caller Location'} • Bennett Univ
           </span>
         </div>
 
@@ -311,7 +293,7 @@ export const CallerLocationMap: React.FC<CallerLocationMapProps> = ({
             {location.provider || 'Cellular Tower Triangulation'}
           </span>
           <span className="text-[10px] text-gray-500 font-mono mt-1">
-            Radius: ±{location.accuracyMeters || 350}m {location.isMock ? '(Demo Data)' : ''}
+            Radius: ±{location.accuracyMeters || 250}m {location.isMock ? '(Demo Data)' : ''}
           </span>
         </div>
       </div>
