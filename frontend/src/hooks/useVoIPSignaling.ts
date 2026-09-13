@@ -5,7 +5,14 @@ import { remoteAudioTap } from '../services/audioTap';
 import { downsampleTo16k, audioChunkAccumulator, type AudioChunk } from '../services/audioConverter';
 import { veraPipeline, type VeraTelemetry } from '../services/veraPipeline';
 import { deviceAudioService } from '../services/deviceAudio';
-import type { CallState, SignalingMessage } from '../types/voip';
+import { api } from '../services/api';
+import type { CallState, SignalingMessage, CallerReputationPayload } from '../types/voip';
+
+export interface IncomingCallData {
+  caller_id: string;
+  call_id: string;
+  reputation?: CallerReputationPayload;
+}
 
 export function useVoIPSignaling() {
   const [currentUser, setCurrentUser] = useState<string>(() => {
@@ -16,8 +23,10 @@ export function useVoIPSignaling() {
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [peerId, setPeerId] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState<number>(0);
-  const [incomingCallData, setIncomingCallData] = useState<{ caller_id: string; call_id: string } | null>(null);
+  const [incomingCallData, setIncomingCallData] = useState<IncomingCallData | null>(null);
+  const [callerReputation, setCallerReputation] = useState<CallerReputationPayload | null>(null);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+
   const [webrtcState, setWebrtcState] = useState<RTCPeerConnectionState>('closed');
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isAudioTapActive, setIsAudioTapActive] = useState<boolean>(false);
@@ -189,9 +198,14 @@ export function useVoIPSignaling() {
 
         case 'call:invite':
           if (msg.call_id && msg.caller_id) {
-            setIncomingCallData({ caller_id: msg.caller_id, call_id: msg.call_id });
+            setIncomingCallData({ 
+              caller_id: msg.caller_id, 
+              call_id: msg.call_id,
+              reputation: msg.reputation 
+            });
             setActiveCallId(msg.call_id);
             setPeerId(msg.caller_id);
+            setCallerReputation(msg.reputation || null);
             setCallState('INCOMING_RINGING');
             signalingService.sendRinging(msg.caller_id, msg.call_id);
           }
@@ -204,15 +218,17 @@ export function useVoIPSignaling() {
           break;
 
         case 'call:accept':
-          if (msg.call_id && peerId) {
+          const targetCallee = msg.callee_id || peerId;
+          if (msg.call_id && targetCallee) {
             setCallState('CONNECTED');
             try {
-              await webrtcManager.startAsCaller(peerId, msg.call_id);
+              await webrtcManager.startAsCaller(targetCallee, msg.call_id);
             } catch (err) {
               console.error('[VoIP] Error starting caller WebRTC:', err);
             }
           }
           break;
+
 
         case 'call:reject':
           setCallState('ENDED');
@@ -269,13 +285,20 @@ export function useVoIPSignaling() {
   }, [currentUser, peerId]);
 
   // Call Actions
-  const initiateCall = useCallback((calleeId: string) => {
+  const initiateCall = useCallback(async (calleeId: string) => {
     const callId = 'call_' + Math.random().toString(36).substring(2, 9);
     setActiveCallId(callId);
     setPeerId(calleeId);
     setCallState('OUTGOING_RINGING');
+    try {
+      const rep = await api.getReputation(calleeId);
+      setCallerReputation(rep as CallerReputationPayload);
+    } catch (_) {
+      setCallerReputation(null);
+    }
     signalingService.sendInvite(calleeId, callId);
   }, []);
+
 
   const acceptIncomingCall = useCallback(async () => {
     if (incomingCallData) {
@@ -345,6 +368,7 @@ export function useVoIPSignaling() {
     callState,
     activeCallId,
     peerId,
+    callerReputation,
     callDuration,
     incomingCallData,
     initiateCall,

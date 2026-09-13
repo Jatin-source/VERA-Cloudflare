@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Text, LargeBinary
 from datetime import datetime
 from app.db.database import Base
 
@@ -13,8 +13,6 @@ class SessionModel(Base):
     risk_level = Column(String, nullable=True)
     decision = Column(String, nullable=True)
 
-from sqlalchemy import LargeBinary
-
 class VoiceProfileModel(Base):
     __tablename__ = "voice_profiles"
 
@@ -23,3 +21,20 @@ class VoiceProfileModel(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     model_name = Column(String)
     embedding = Column(LargeBinary)
+
+class CallerReputationModel(Base):
+    __tablename__ = "caller_reputation"
+
+    id = Column(Integer, primary_key=True, index=True)
+    caller_id = Column(String(64), unique=True, index=True)
+    display_name = Column(String(128), nullable=True)
+    category = Column(String(32), default="CLEAN_NEUTRAL")  # VERIFIED_USER, CLEAN_NEUTRAL, SUSPICIOUS, SCAM_SUSPECTED, FRAUD_CONFIRMED
+    trust_score = Column(Integer, default=50)               # 0 (severe fraud) to 100 (verified safe)
+    total_calls_analyzed = Column(Integer, default=0)
+    scam_incidents_count = Column(Integer, default=0)
+    ai_clone_detected_count = Column(Integer, default=0)
+    threat_tags = Column(Text, default="[]")                 # JSON string list
+    last_verdict = Column(String(16), nullable=True)         # 'ALLOW', 'MONITOR', 'CHALLENGE', 'BLOCK'
+    last_call_timestamp = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+

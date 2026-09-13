@@ -16,6 +16,7 @@ def get_ice_config():
     """
     Returns dynamically configured STUN/TURN server list.
     Decoupled from frontend codebase (Recommendation #6).
+    Includes public TURN relay servers for carrier-grade NAT & symmetric mobile networks.
     """
     return {
         "iceServers": [
@@ -23,11 +24,22 @@ def get_ice_config():
                 "urls": [
                     "stun:stun.l.google.com:19302",
                     "stun:stun1.l.google.com:19302",
-                    "stun:stun2.l.google.com:19302"
+                    "stun:stun2.l.google.com:19302",
+                    "stun:stun.cloudflare.com:3478"
                 ]
+            },
+            {
+                "urls": [
+                    "turn:openrelay.metered.ca:80",
+                    "turn:openrelay.metered.ca:443",
+                    "turn:openrelay.metered.ca:443?transport=tcp"
+                ],
+                "username": "openrelayproject",
+                "credential": "openrelayproject"
             }
         ]
     }
+
 
 @router.websocket("/api/v1/ws/signaling/{user_id}")
 async def signaling_websocket(websocket: WebSocket, user_id: str):

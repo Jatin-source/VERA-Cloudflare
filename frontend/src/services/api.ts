@@ -7,10 +7,29 @@ export interface SessionCreateRequest {
   caller_id?: string;
 }
 
+export interface CallerReputation {
+  id?: number;
+  caller_id: string;
+  display_name: string;
+  category: 'VERIFIED_USER' | 'CLEAN_NEUTRAL' | 'SUSPICIOUS' | 'SCAM_SUSPECTED' | 'FRAUD_CONFIRMED' | string;
+  trust_score: number;
+  total_calls_analyzed: number;
+  scam_incidents_count: number;
+  ai_clone_detected_count: number;
+  threat_tags: string[];
+  last_verdict?: string | null;
+  last_call_timestamp?: string | null;
+}
+
 export interface SessionResponse {
   id: number;
   session_id: string;
   caller_id: string | null;
+  caller_name?: string | null;
+  reputation_category?: 'VERIFIED_USER' | 'CLEAN_NEUTRAL' | 'SUSPICIOUS' | 'SCAM_SUSPECTED' | 'FRAUD_CONFIRMED' | string;
+  trust_score?: number;
+  threat_tags?: string[];
+  scam_count?: number;
   created_at: string;
   status: string;
   risk_level?: string;
@@ -227,5 +246,18 @@ export const api = {
       method: 'POST',
       body: formData,
     });
-  }
+  },
+
+  getReputation: (callerId: string): Promise<CallerReputation> =>
+    fetchWithHandle(`/api/v1/reputation/${encodeURIComponent(callerId)}`, {
+      headers: { 'Content-Type': 'application/json' }
+    }),
+
+  reportCaller: (callerId: string, isScam: boolean, tag?: string): Promise<CallerReputation> =>
+    fetchWithHandle(`/api/v1/reputation/${encodeURIComponent(callerId)}/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_scam: isScam, tag })
+    })
 };
+

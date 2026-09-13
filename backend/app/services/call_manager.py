@@ -85,6 +85,7 @@ class CallManager:
         if msg_type == "call:invite":
             callee_id = data.get("callee_id")
             if not callee_id or callee_id not in self.active_connections:
+                logger.warning(f"Invite failed: callee '{callee_id}' not online. Online users: {self.get_online_users()}")
                 await self.send_to_user(user_id, {
                     "type": "call:reject",
                     "call_id": call_id,
@@ -93,6 +94,7 @@ class CallManager:
                 return
 
             if self.is_user_in_call(callee_id):
+                logger.warning(f"Invite failed: callee '{callee_id}' is busy in call")
                 await self.send_to_user(user_id, {
                     "type": "call:reject",
                     "call_id": call_id,
@@ -103,16 +105,34 @@ class CallManager:
             # Register call session
             self.active_calls[call_id] = CallSession(call_id, user_id, callee_id)
 
-            # Send invite to callee
+            # Pre-call Reputation Lookup in Central Database
+            rep_data = None
+            try:
+                from app.db.database import SessionLocal
+                from app.services import reputation_service
+                db = SessionLocal()
+                try:
+                    rep = reputation_service.get_or_create_reputation(db, user_id)
+                    rep_data = reputation_service.to_dict(rep)
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error(f"Error fetching caller reputation for {user_id}: {e}")
+
+            logger.info(f"Signaling [call:invite]: {user_id} -> {callee_id} (call_id: {call_id}, category: {rep_data.get('category') if rep_data else 'UNKNOWN'})")
+
+            # Send invite to callee with caller reputation dossier
             await self.send_to_user(callee_id, {
                 "type": "call:invite",
                 "call_id": call_id,
                 "caller_id": user_id,
+                "reputation": rep_data,
                 "timestamp": datetime.utcnow().isoformat() + "Z"
             })
 
         elif msg_type == "call:ringing":
             caller_id = data.get("caller_id")
+            logger.info(f"Signaling [call:ringing]: {user_id} (callee) -> {caller_id} (caller) [call: {call_id}]")
             await self.send_to_user(caller_id, {
                 "type": "call:ringing",
                 "call_id": call_id,
@@ -124,6 +144,7 @@ class CallManager:
             if call_id in self.active_calls:
                 self.active_calls[call_id].state = "connected"
 
+            logger.info(f"Signaling [call:accept]: {user_id} (callee) -> {caller_id} (caller) [call: {call_id}]")
             await self.send_to_user(caller_id, {
                 "type": "call:accept",
                 "call_id": call_id,
@@ -136,6 +157,7 @@ class CallManager:
             if call_id in self.active_calls:
                 del self.active_calls[call_id]
 
+            logger.info(f"Signaling [call:reject]: {user_id} -> {caller_id} [reason: {reason}]")
             await self.send_to_user(caller_id, {
                 "type": "call:reject",
                 "call_id": call_id,
@@ -148,6 +170,7 @@ class CallManager:
             if call:
                 peer_id = call.callee_id if call.caller_id == user_id else call.caller_id
                 del self.active_calls[call_id]
+                logger.info(f"Signaling [call:end]: {user_id} ended call with {peer_id} (call: {call_id})")
                 await self.send_to_user(peer_id, {
                     "type": "call:end",
                     "call_id": call_id,
@@ -157,13 +180,16 @@ class CallManager:
         elif msg_type == "ping":
             await self.send_to_user(user_id, {"type": "pong"})
 
-        # Milestone 2 WebRTC Signaling passthrough:
+        # WebRTC Signaling passthrough:
         elif msg_type in ["webrtc:offer", "webrtc:answer", "webrtc:ice"]:
             if not target_id and call_id in self.active_calls:
                 call = self.active_calls[call_id]
                 target_id = call.callee_id if call.caller_id == user_id else call.caller_id
             if target_id:
                 data["sender_id"] = user_id
+                logger.info(f"Signaling [{msg_type}]: {user_id} -> {target_id} (call: {call_id})")
                 await self.send_to_user(target_id, data)
+            else:
+                logger.warning(f"Signaling [{msg_type}] target not found for call: {call_id}, user: {user_id}")
 
 call_manager = CallManager()

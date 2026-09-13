@@ -31,7 +31,9 @@ import {
   ExternalLink,
   X,
   Search,
-  Check
+  Check,
+  UserCheck,
+  Shield
 } from 'lucide-react';
 import { useVoIPSignaling } from '../hooks/useVoIPSignaling';
 import { CallerLocationMap } from '../components/CallerLocationMap';
@@ -144,6 +146,7 @@ const CallScreen: React.FC = () => {
     onlineUsers,
     callState,
     peerId,
+    callerReputation,
     callDuration,
     incomingCallData,
     initiateCall,
@@ -532,6 +535,20 @@ const CallScreen: React.FC = () => {
                   <span>Tap: <strong className="text-purple-400">16kHz</strong></span>
                 </span>
               )}
+              {callerReputation && (
+                <span className={`px-3 py-1 rounded-full border text-xs flex items-center gap-1.5 font-mono ${
+                  callerReputation.category === 'VERIFIED_USER'
+                    ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-400'
+                    : callerReputation.category === 'FRAUD_CONFIRMED'
+                    ? 'bg-red-950/60 border-red-500/40 text-red-400'
+                    : callerReputation.category === 'SCAM_SUSPECTED'
+                    ? 'bg-amber-950/60 border-amber-500/40 text-amber-400'
+                    : 'bg-[#121d30] border-[#1a2333] text-gray-300'
+                }`}>
+                  <Shield size={12} />
+                  <span>Trust: <strong>{callerReputation.trust_score}%</strong> ({callerReputation.category.replace('_', ' ')})</span>
+                </span>
+              )}
             </div>
 
             {/* Call Action Buttons */}
@@ -823,42 +840,130 @@ const CallScreen: React.FC = () => {
         </div>
       )}
 
-      {/* INCOMING CALL MODAL / OVERLAY */}
-      {callState === 'INCOMING_RINGING' && incomingCallData && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0a101d] border-2 border-blue-500/50 p-6 md:p-8 rounded-3xl shadow-[0_0_50px_rgba(37,99,235,0.3)] max-w-sm w-full text-center space-y-6 animate-pulse">
-            <div className="w-20 h-20 rounded-full bg-blue-600/20 border-2 border-blue-500 flex items-center justify-center text-blue-400 mx-auto shadow-[0_0_20px_rgba(37,99,235,0.4)]">
-              <PhoneIncoming size={36} className="animate-bounce" />
-            </div>
+      {/* INCOMING CALL MODAL / OVERLAY WITH CENTRAL THREAT REPUTATION */}
+      {callState === 'INCOMING_RINGING' && incomingCallData && (() => {
+        const rep = incomingCallData.reputation || callerReputation;
+        const isFraud = rep?.category === 'FRAUD_CONFIRMED';
+        const isScam = rep?.category === 'SCAM_SUSPECTED';
+        const isVerified = rep?.category === 'VERIFIED_USER';
+        const isSuspicious = rep?.category === 'SUSPICIOUS';
 
-            <div>
-              <p className="text-xs text-blue-400 font-medium tracking-wide uppercase">
-                Incoming VoIP Call
-              </p>
-              <h3 className="text-2xl font-bold text-white mt-1">
-                {incomingCallData.caller_id}
-              </h3>
-            </div>
+        const borderColor = isFraud
+          ? 'border-red-500 shadow-[0_0_60px_rgba(239,68,68,0.4)]'
+          : isScam || isSuspicious
+          ? 'border-amber-500 shadow-[0_0_50px_rgba(245,158,11,0.35)]'
+          : isVerified
+          ? 'border-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.35)]'
+          : 'border-blue-500/50 shadow-[0_0_50px_rgba(37,99,235,0.3)]';
 
-            <div className="flex items-center justify-center space-x-6 pt-2">
-              <button
-                onClick={() => rejectIncomingCall('declined')}
-                className="w-14 h-14 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-all hover:scale-105"
-                title="Decline"
-              >
-                <PhoneOff size={24} />
-              </button>
-              <button
-                onClick={acceptIncomingCall}
-                className="w-14 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 transition-all hover:scale-105"
-                title="Accept"
-              >
-                <Phone size={24} />
-              </button>
+        return (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className={`bg-[#0a101d] border-2 ${borderColor} p-6 md:p-8 rounded-3xl max-w-md w-full text-center space-y-5 animate-in fade-in zoom-in duration-200`}>
+              
+              {/* Call Icon Avatar */}
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto border-2 shadow-lg ${
+                isFraud 
+                  ? 'bg-red-950/60 border-red-500 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.5)]'
+                  : isVerified
+                  ? 'bg-emerald-950/60 border-emerald-500 text-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]'
+                  : isScam || isSuspicious
+                  ? 'bg-amber-950/60 border-amber-500 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]'
+                  : 'bg-blue-600/20 border-blue-500 text-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.4)]'
+              }`}>
+                {isFraud ? (
+                  <ShieldAlert size={38} className="animate-pulse" />
+                ) : isVerified ? (
+                  <ShieldCheck size={38} />
+                ) : (
+                  <PhoneIncoming size={36} className="animate-bounce" />
+                )}
+              </div>
+
+              {/* Central Threat & Reputation Alert Banner */}
+              {rep && (
+                <div className={`p-3.5 rounded-2xl text-left space-y-1.5 border ${
+                  isFraud
+                    ? 'bg-red-950/80 border-red-500/50'
+                    : isScam
+                    ? 'bg-amber-950/80 border-amber-500/50'
+                    : isVerified
+                    ? 'bg-emerald-950/80 border-emerald-500/50'
+                    : 'bg-[#121d30] border-[#1a2333]'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs font-bold flex items-center gap-1.5 uppercase tracking-wide ${
+                      isFraud ? 'text-red-400' : isScam ? 'text-amber-400' : isVerified ? 'text-emerald-400' : 'text-gray-300'
+                    }`}>
+                      {isFraud && <ShieldAlert size={14} className="animate-pulse" />}
+                      {isScam && <AlertTriangle size={14} />}
+                      {isVerified && <ShieldCheck size={14} />}
+                      {!isFraud && !isScam && !isVerified && <UserCheck size={14} />}
+                      {isFraud ? 'Threat Alert: Fraud History' : isScam ? 'Warning: Scam Suspected' : isVerified ? 'Verified Authentic Caller' : 'Neutral Caller Profile'}
+                    </span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                      isFraud ? 'bg-red-900/60 text-red-300' : isScam ? 'bg-amber-900/60 text-amber-300' : isVerified ? 'bg-emerald-900/60 text-emerald-300' : 'bg-[#1a2333] text-gray-300'
+                    }`}>
+                      {rep.trust_score}% Trust
+                    </span>
+                  </div>
+
+                  <p className={`text-xs ${
+                    isFraud ? 'text-red-300' : isScam ? 'text-amber-300' : isVerified ? 'text-emerald-300' : 'text-gray-400'
+                  }`}>
+                    {isFraud
+                      ? `Flagged in ${rep.scam_incidents_count || 1} previous calls on the network for ${rep.threat_tags?.slice(0, 2).join(', ') || 'Voice Spoofing'}.`
+                      : isScam
+                      ? 'Previous calls exhibited suspicious extortion or urgent impersonation patterns.'
+                      : isVerified
+                      ? `Voiceprint biometrically verified. Clean communication record across ${rep.total_calls_analyzed || 1} calls.`
+                      : 'First time calling on VERA collective defense network. Live forensic monitoring active.'}
+                  </p>
+
+                  {rep.threat_tags && rep.threat_tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {rep.threat_tags.slice(0, 3).map((tag, i) => (
+                        <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-black/40 border border-white/10 font-mono text-gray-300">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs text-blue-400 font-medium tracking-wide uppercase">
+                  Incoming VoIP Call
+                </p>
+                <h3 className="text-2xl font-bold text-white mt-1">
+                  {rep?.display_name || incomingCallData.caller_id}
+                </h3>
+                {rep?.display_name && rep.display_name !== incomingCallData.caller_id && (
+                  <p className="text-xs font-mono text-gray-400 mt-0.5">{incomingCallData.caller_id}</p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-center space-x-6 pt-2">
+                <button
+                  onClick={() => rejectIncomingCall('declined')}
+                  className="w-14 h-14 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 transition-all hover:scale-105"
+                  title="Decline"
+                >
+                  <PhoneOff size={24} />
+                </button>
+                <button
+                  onClick={acceptIncomingCall}
+                  className="w-14 h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 transition-all hover:scale-105"
+                  title="Accept"
+                >
+                  <Phone size={24} />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {/* MILESTONE 18: IN-CALL OUT-OF-BAND VERIFICATION SUITE MODAL */}
       {showVerifyModal && callState === 'CONNECTED' && (
         <div className="fixed inset-0 z-40 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">

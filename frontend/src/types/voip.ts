@@ -12,6 +12,19 @@ export interface IceServerConfig {
   credential?: string;
 }
 
+export interface CallerReputationPayload {
+  caller_id: string;
+  display_name: string;
+  category: 'VERIFIED_USER' | 'CLEAN_NEUTRAL' | 'SUSPICIOUS' | 'SCAM_SUSPECTED' | 'FRAUD_CONFIRMED' | string;
+  trust_score: number;
+  total_calls_analyzed: number;
+  scam_incidents_count: number;
+  ai_clone_detected_count: number;
+  threat_tags: string[];
+  last_verdict?: string | null;
+  last_call_timestamp?: string | null;
+}
+
 export interface SignalingMessage {
   type: 
     | 'call:invite'
@@ -33,4 +46,6 @@ export interface SignalingMessage {
   candidate?: any;
   users?: string[];
   timestamp?: string;
+  reputation?: CallerReputationPayload;
 }
+

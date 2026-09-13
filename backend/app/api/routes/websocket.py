@@ -196,6 +196,23 @@ async def websocket_endpoint(
                 "risk_level": reported_risk_level,
                 "decision": policy_result.get("decision")
             })
+
+            # Update Central Caller Reputation Ledger
+            try:
+                db_sess = session_service.get_session(db, session_id)
+                if db_sess and db_sess.caller_id:
+                    from app.services import reputation_service
+                    has_spoof = (voice_result.get("ai_voice_probability") or 0.0) >= 0.65
+                    reputation_service.record_session_outcome(
+                        db=db,
+                        caller_id=db_sess.caller_id,
+                        risk_level=reported_risk_level,
+                        decision=policy_result.get("decision", "ALLOW"),
+                        signals=risk_result.get("contributing_signals", []),
+                        has_voice_spoof=has_spoof
+                    )
+            except Exception as rep_err:
+                logger.warning(f"Failed to update central reputation ledger: {rep_err}")
             
             response = {
                 "session_id": session_id,
@@ -215,12 +232,18 @@ async def websocket_endpoint(
                 
             await websocket.send_json(response)
             
+        except WebSocketDisconnect:
+            logger.info(f"Client disconnected gracefully during audio processing for session: {session_id}")
+            return
         except Exception as e:
             err_msg = str(e)
             resp = {"error": f"Audio parsing or processing failed: {err_msg}", "session_id": session_id}
             if chunk_id is not None:
                 resp["chunk_id"] = chunk_id
-            await websocket.send_json(resp)
+            try:
+                await websocket.send_json(resp)
+            except Exception:
+                pass
         finally:
             if temp_audio_path and os.path.exists(temp_audio_path):
                 os.remove(temp_audio_path)
