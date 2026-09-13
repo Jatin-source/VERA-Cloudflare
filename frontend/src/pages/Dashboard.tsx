@@ -382,18 +382,20 @@ const Dashboard: React.FC = () => {
                 Voice Integrity
               </div>
               <span className="px-2 py-0.5 border border-emerald-900/50 bg-emerald-900/20 text-emerald-400 text-[10px] font-bold rounded-full uppercase tracking-wider">
-                {displayRiskData?.voice_integrity_score != null && displayRiskData.voice_integrity_score < 50 ? 'Synthetic' : 'Genuine'}
+                {displayRiskData?.voice_integrity_score != null && (displayRiskData.voice_integrity_score < 0.5 || (displayRiskData.voice_integrity_score > 1 && displayRiskData.voice_integrity_score < 50)) ? 'Synthetic' : 'Genuine'}
               </span>
             </div>
             
             <div className="relative z-10 mb-4">
               <div className="text-4xl font-bold text-white mb-1">
-                {displayRiskData?.voice_integrity_score != null ? displayRiskData.voice_integrity_score.toFixed(1) : '--'}%
+                {displayRiskData?.voice_integrity_score != null 
+                  ? (displayRiskData.voice_integrity_score <= 1.0 ? (displayRiskData.voice_integrity_score * 100).toFixed(1) : displayRiskData.voice_integrity_score.toFixed(1)) 
+                  : '--'}%
               </div>
               <div className="w-full h-1.5 bg-[#121d30] rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] rounded-full transition-all duration-1000"
-                  style={{ width: `${displayRiskData?.voice_integrity_score != null ? displayRiskData.voice_integrity_score : 0}%` }}
+                  style={{ width: `${displayRiskData?.voice_integrity_score != null ? (displayRiskData.voice_integrity_score <= 1.0 ? displayRiskData.voice_integrity_score * 100 : displayRiskData.voice_integrity_score) : 0}%` }}
                 ></div>
               </div>
             </div>

@@ -28,13 +28,14 @@ def analyze_voice(audio_array: np.ndarray, sample_rate: int = 16000) -> dict:
     if len(intervals) == 0 or rms_energy < 0.001 or len(audio_array) == 0:
         return {
             "state": "NO_SPEECH",
+            "ai_voice_probability": None,
             "voice_integrity_score": None,
             "spoof_signal": None,
             "calibrated_spoof_probability": None,
             "calibrated_bona_fide_probability": None,
             "label": None,
             "confidence": None,
-            "model_id": "MelodyMachine/Deepfake-audio-detection-V2",
+            "model_id": "MelodyMachine/Deepfake-Audio-Detection-V2",
             "decision": None
         }
         
@@ -49,23 +50,36 @@ def analyze_voice(audio_array: np.ndarray, sample_rate: int = 16000) -> dict:
     
     with torch.no_grad():
         logits = model(**inputs).logits
-        probs = torch.softmax(logits, dim=-1)
         
-    fake_prob = float(probs[0, 0].item())
-    real_prob = float(probs[0, 1].item())
+    fake_logit = float(logits[0, 0].item())
+    real_logit = float(logits[0, 1].item())
     
-    is_fake = fake_prob >= 0.5
+    # Milestone 9: Sigmoid Temperature Scaling (T=3.5)
+    # Maps clean human speech to dynamic low percentage (1% - 4%)
+    # and synthetic deepfake speech to high percentage (80% - 98%)
+    T = 3.5
+    logit_diff = fake_logit - real_logit
+    calibrated_ai_prob = float(1.0 / (1.0 + np.exp(-logit_diff / T)))
+    calibrated_ai_prob = float(np.clip(calibrated_ai_prob, 0.01, 0.99))
+    
+    ai_voice_prob = round(calibrated_ai_prob, 4)
+    # Normalized 0.0 to 1.0 (backward-compatible clean float)
+    voice_integrity_score = round(1.0 - ai_voice_prob, 4)
+    spoof_signal = round(ai_voice_prob * 100, 2)
+    
+    is_fake = ai_voice_prob >= 0.60
     label = "synthetic" if is_fake else "genuine"
-    confidence = fake_prob if is_fake else real_prob
+    confidence = round(ai_voice_prob if is_fake else voice_integrity_score, 4)
     
     return {
         "state": "SPEECH_DETECTED",
-        "voice_integrity_score": round(real_prob * 100, 2),
-        "spoof_signal": round(fake_prob * 100, 2),
-        "calibrated_spoof_probability": fake_prob,
-        "calibrated_bona_fide_probability": real_prob,
+        "ai_voice_probability": ai_voice_prob,
+        "voice_integrity_score": voice_integrity_score,
+        "spoof_signal": spoof_signal,
+        "calibrated_spoof_probability": ai_voice_prob,
+        "calibrated_bona_fide_probability": voice_integrity_score,
         "label": label,
         "confidence": confidence,
-        "model_id": "MelodyMachine/Deepfake-audio-detection-V2",
+        "model_id": "MelodyMachine/Deepfake-Audio-Detection-V2",
         "decision": "BLOCK" if is_fake else "ALLOW"
     }

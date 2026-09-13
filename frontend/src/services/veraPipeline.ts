@@ -4,7 +4,9 @@ export interface VeraTelemetry {
   session_id: string;
   chunk_id?: number;
   transcript?: string;
+  ai_voice_probability?: number;
   voice_integrity_score?: number;
+  spoof_signal?: number;
   overall_risk_score?: number;
   risk_level?: 'low' | 'medium' | 'high' | 'critical' | string;
   decision?: 'ALLOW' | 'MONITOR' | 'CHALLENGE' | 'BLOCK' | string;

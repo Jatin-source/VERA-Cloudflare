@@ -51,7 +51,7 @@ def test_websocket_chunk_processing(mock_transcribe, mock_analyze):
     
     with client.websocket_connect(f"/api/v1/ws/sessions/{session_id}") as websocket:
         # 1. receiving one valid chunk
-        mock_analyze.return_value = {"voice_integrity_score": 0.1, "confidence": 0.9}
+        mock_analyze.return_value = {"state": "SPEECH_DETECTED", "ai_voice_probability": 0.03, "voice_integrity_score": 0.97, "confidence": 0.9}
         mock_transcribe.return_value = {"transcript": "hello", "language": "en"}
         
         websocket.send_json({
@@ -66,7 +66,7 @@ def test_websocket_chunk_processing(mock_transcribe, mock_analyze):
         
         # 2. receiving multiple sequential chunks (chunk 2)
         # We will make this chunk highly suspicious so risk goes to CRITICAL
-        mock_analyze.return_value = {"voice_integrity_score": 0.9, "confidence": 0.9} # High AI voice
+        mock_analyze.return_value = {"state": "SPEECH_DETECTED", "ai_voice_probability": 0.95, "voice_integrity_score": 0.05, "confidence": 0.9} # High AI voice
         mock_transcribe.return_value = {"transcript": "urgent share otp and transfer money", "language": "en"}
         
         websocket.send_json({
@@ -81,7 +81,7 @@ def test_websocket_chunk_processing(mock_transcribe, mock_analyze):
         
         # 3. session risk persistence
         # Next chunk is completely benign, but risk should stay CRITICAL
-        mock_analyze.return_value = {"voice_integrity_score": 0.1, "confidence": 0.9}
+        mock_analyze.return_value = {"state": "SPEECH_DETECTED", "ai_voice_probability": 0.03, "voice_integrity_score": 0.97, "confidence": 0.9}
         mock_transcribe.return_value = {"transcript": "hello", "language": "en"}
         
         websocket.send_json({

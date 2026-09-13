@@ -57,33 +57,37 @@ def test_analyze_voice_mapping_genuine():
         mock_extractor = MagicMock(return_value={'input_values': torch.tensor([[0.0]])})
         
         mock_model = MagicMock()
-        mock_logits = torch.tensor([[5.0, -5.0]]) # [0]=high (real), [1]=low (fake)
+        mock_logits = torch.tensor([[-5.0, 5.0]]) # [0]=fake (-5.0), [1]=real (5.0)
         mock_model.return_value.logits = mock_logits
         
         mock_device = torch.device('cpu')
         mock_get_model.return_value = (mock_extractor, mock_model, mock_device)
         
-        audio = np.zeros(16000, dtype=np.float32)
+        # Audio with non-zero energy to pass VAD
+        audio = np.ones(16000, dtype=np.float32) * 0.1
         result = analyze_voice(audio, 16000)
         
         assert result['label'] == 'genuine'
-        assert result['voice_integrity_score'] < 0.5
-        assert result['confidence'] > 0.9
+        assert result['ai_voice_probability'] < 0.10
+        assert result['voice_integrity_score'] > 0.90
+        assert result['confidence'] > 0.90
 
 def test_analyze_voice_mapping_synthetic():
     with patch('app.services.voice_integrity_service.get_model') as mock_get_model:
         mock_extractor = MagicMock(return_value={'input_values': torch.tensor([[0.0]])})
         
         mock_model = MagicMock()
-        mock_logits = torch.tensor([[-5.0, 5.0]]) # [0]=low (real), [1]=high (fake)
+        mock_logits = torch.tensor([[5.0, -5.0]]) # [0]=fake (5.0), [1]=real (-5.0)
         mock_model.return_value.logits = mock_logits
         
         mock_device = torch.device('cpu')
         mock_get_model.return_value = (mock_extractor, mock_model, mock_device)
         
-        audio = np.zeros(16000, dtype=np.float32)
+        # Audio with non-zero energy to pass VAD
+        audio = np.ones(16000, dtype=np.float32) * 0.1
         result = analyze_voice(audio, 16000)
         
         assert result['label'] == 'synthetic'
-        assert result['voice_integrity_score'] > 0.5
-        assert result['confidence'] > 0.9
+        assert result['ai_voice_probability'] > 0.80
+        assert result['voice_integrity_score'] < 0.20
+        assert result['confidence'] > 0.80

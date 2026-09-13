@@ -8,6 +8,7 @@ from typing import Optional
 import tempfile
 import os
 import librosa
+import numpy as np
 from app.db.database import get_db
 from app.services import session_service
 from app.services import voice_integrity_service
@@ -45,8 +46,13 @@ async def websocket_endpoint(
     processed_chunk_ids = set()
     current_max_risk = db_session.risk_level or "low"
     
+    # Milestone 10: 3.0s sliding FIFO buffer for voice integrity and EMA smoothing
+    audio_history = []
+    MAX_BUFFER_SAMPLES = 48000 # 3.0 seconds at 16kHz
+    last_smooth_ai_prob: Optional[float] = None
+    
     async def process_audio_payload(audio_bytes: bytes, chunk_id: Optional[int] = None):
-        nonlocal current_max_risk
+        nonlocal current_max_risk, audio_history, last_smooth_ai_prob
         temp_audio_path = None
         try:
             if not audio_bytes or len(audio_bytes) < 4000:
@@ -63,14 +69,39 @@ async def websocket_endpoint(
             except Exception as e:
                 raise ValueError(f"Invalid WAV or audio format: {str(e)}")
             
-            voice_result = voice_integrity_service.analyze_voice(y, sr)
+            # Milestone 10: Accumulate into 3.0s sliding FIFO buffer for phoneme continuity
+            audio_history.extend(y.tolist())
+            if len(audio_history) > MAX_BUFFER_SAMPLES:
+                audio_history = audio_history[-MAX_BUFFER_SAMPLES:]
+                
+            y_buffered = np.array(audio_history, dtype=np.float32)
+            voice_result = voice_integrity_service.analyze_voice(y_buffered, sr)
             t2 = time.perf_counter()
             
+            # Milestone 10: Exponential Moving Average (EMA: 0.30/0.70)
+            if voice_result.get("state") == "SPEECH_DETECTED" and voice_result.get("ai_voice_probability") is not None:
+                current_raw_ai = voice_result["ai_voice_probability"]
+                if last_smooth_ai_prob is None:
+                    last_smooth_ai_prob = current_raw_ai
+                else:
+                    last_smooth_ai_prob = 0.30 * current_raw_ai + 0.70 * last_smooth_ai_prob
+                
+                voice_result["ai_voice_probability"] = round(last_smooth_ai_prob, 4)
+                voice_result["spoof_signal"] = round(last_smooth_ai_prob * 100, 2)
+                voice_result["voice_integrity_score"] = round(1.0 - last_smooth_ai_prob, 4)
+            
             if voice_result.get("state") == "NO_SPEECH":
+                # Milestone 10: Hold previous valid AI probability during conversational pauses
+                held_ai_prob = round(last_smooth_ai_prob, 4) if last_smooth_ai_prob is not None else None
+                held_vi_score = round(1.0 - last_smooth_ai_prob, 4) if last_smooth_ai_prob is not None else None
+                held_spoof = round(last_smooth_ai_prob * 100, 2) if last_smooth_ai_prob is not None else None
+                
                 response = {
                     "session_id": session_id,
                     "transcript": "",
-                    "voice_integrity_score": None,
+                    "ai_voice_probability": held_ai_prob,
+                    "voice_integrity_score": held_vi_score,
+                    "spoof_signal": held_spoof,
                     "speaker_similarity_score": None,
                     "overall_risk_score": None,
                     "risk_level": current_max_risk,
@@ -130,7 +161,9 @@ async def websocket_endpoint(
             response = {
                 "session_id": session_id,
                 "transcript": transcript,
+                "ai_voice_probability": voice_result.get("ai_voice_probability"),
                 "voice_integrity_score": voice_result.get("voice_integrity_score"),
+                "spoof_signal": voice_result.get("spoof_signal"),
                 "speaker_similarity_score": None,
                 "overall_risk_score": risk_result.get("overall_risk_score"),
                 "risk_level": reported_risk_level,

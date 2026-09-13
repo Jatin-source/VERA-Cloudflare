@@ -13,7 +13,7 @@ client = TestClient(app)
 @patch("app.services.asr_service.transcribe_audio")
 def test_e2e_unknown_caller(mock_transcribe, mock_analyze):
     # Mock ML
-    mock_analyze.return_value = {"voice_integrity_score": 0.1, "label": "genuine", "confidence": 0.9}
+    mock_analyze.return_value = {"ai_voice_probability": 0.03, "voice_integrity_score": 0.97, "label": "genuine", "confidence": 0.9}
     
     
     
@@ -94,7 +94,7 @@ def test_e2e_unknown_caller(mock_transcribe, mock_analyze):
 @patch("app.services.asr_service.transcribe_audio")
 def test_e2e_known_caller_critical(mock_transcribe, mock_analyze):
     # Mock ML
-    mock_analyze.return_value = {"voice_integrity_score": 0.9, "label": "fake", "confidence": 0.9} # Deepfake!
+    mock_analyze.return_value = {"ai_voice_probability": 0.95, "voice_integrity_score": 0.05, "label": "synthetic", "confidence": 0.9} # Deepfake!
     
     
     

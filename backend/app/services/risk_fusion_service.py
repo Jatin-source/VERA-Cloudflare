@@ -6,8 +6,19 @@ def calculate_risk(voice_analysis: dict = None, intent_analysis: dict = None, ac
     confidence_weight = 0.0
     
     # Extract scores
-    vi_score = voice_analysis.get('voice_integrity_score', 0.0) if voice_analysis else 0.0
-    vi_conf = voice_analysis.get('confidence', 1.0) if voice_analysis else 1.0
+    ai_prob = 0.0
+    vi_conf = 1.0
+    has_voice = False
+    if voice_analysis and voice_analysis.get('state') != 'NO_SPEECH':
+        has_voice = True
+        vi_conf = voice_analysis.get('confidence', 1.0)
+        if 'ai_voice_probability' in voice_analysis and voice_analysis['ai_voice_probability'] is not None:
+            ai_prob = float(voice_analysis['ai_voice_probability'])
+        elif 'voice_integrity_score' in voice_analysis and voice_analysis['voice_integrity_score'] is not None:
+            raw_vi = float(voice_analysis['voice_integrity_score'])
+            if raw_vi > 1.0:
+                raw_vi = raw_vi / 100.0
+            ai_prob = max(0.0, min(1.0, 1.0 - raw_vi))
     
     in_score = intent_analysis.get('social_engineering_score', 0.0) if intent_analysis else 0.0
     in_conf = intent_analysis.get('confidence', 1.0) if intent_analysis else 1.0
@@ -24,7 +35,7 @@ def calculate_risk(voice_analysis: dict = None, intent_analysis: dict = None, ac
         ac_conf = action_context_analysis.get('confidence', 1.0)
         ac_signals = action_context_analysis.get('signals', [])
 
-    if vi_score < 0.4:
+    if ai_prob >= 0.60:
         signals.append('high_voice_manipulation_probability')
     signals.extend(intent_signals)
     for sig in ac_signals:
@@ -32,7 +43,7 @@ def calculate_risk(voice_analysis: dict = None, intent_analysis: dict = None, ac
             signals.append(sig)
 
     # Determine Context-Adaptive Weights
-    if vi_score <= 0.3:
+    if ai_prob >= 0.70:
         # STRONG AI-GENERATED / SYNTHETIC VOICE
         w_voice = 0.70
         w_intent = 0.15
@@ -49,8 +60,8 @@ def calculate_risk(voice_analysis: dict = None, intent_analysis: dict = None, ac
         w_action = 0.25
 
     # Apply Weights
-    if voice_analysis:
-        weighted_sum += (1.0 - vi_score) * w_voice
+    if has_voice:
+        weighted_sum += ai_prob * w_voice
         total_weight += w_voice
         total_confidence += vi_conf * w_voice
         confidence_weight += w_voice
@@ -70,7 +81,7 @@ def calculate_risk(voice_analysis: dict = None, intent_analysis: dict = None, ac
     overall_risk_score = 0.0
     final_confidence = 0.0
     if total_weight > 0:
-        overall_risk_score = min(1.0, weighted_sum / total_weight)
+        overall_risk_score = max(0.0, min(1.0, weighted_sum / total_weight))
         final_confidence = total_confidence / confidence_weight
 
     # Security Escalation Rules
@@ -89,13 +100,13 @@ def calculate_risk(voice_analysis: dict = None, intent_analysis: dict = None, ac
         overall_risk_score = max(overall_risk_score, 0.75)
         escalated = True
         
-    if vi_score <= 0.3:
+    if has_voice and ai_prob >= 0.70:
         overall_risk_score = max(overall_risk_score, 0.65)
         escalated = True
 
     # Demotion / Clamping
     # Genuine voice + normal conversation without suspicious behavior -> should remain LOW
-    if not escalated and vi_score > 0.6 and in_score < 0.4 and ac_score < 0.4:
+    if not escalated and (not has_voice or ai_prob < 0.30) and in_score < 0.4 and ac_score < 0.4:
         overall_risk_score = min(overall_risk_score, 0.20)
         
     if overall_risk_score >= 0.85:

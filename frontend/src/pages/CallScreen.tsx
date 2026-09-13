@@ -91,15 +91,23 @@ const CallScreen: React.FC = () => {
 
   // Derive risk metrics
   const riskLevel = veraTelemetry?.risk_level?.toLowerCase() || 'low';
-  const overallRisk = veraTelemetry?.overall_risk_score !== undefined 
+  const overallRisk = veraTelemetry?.overall_risk_score !== undefined && veraTelemetry?.overall_risk_score !== null
     ? Math.round(veraTelemetry.overall_risk_score * 100) 
     : 0;
-  const voiceIntegrity = veraTelemetry?.voice_integrity_score !== undefined
-    ? Math.round(veraTelemetry.voice_integrity_score * 100)
-    : 100;
+
+  // AI Voice Probability (0.0 to 1.0)
+  // When real human speaks, this yields low numbers (1%, 2%, 3%, 4% etc.)
+  // When AI / synthetic voice is detected, this rises to 70% - 95%
+  const rawAiVoice = veraTelemetry?.ai_voice_probability !== undefined && veraTelemetry?.ai_voice_probability !== null
+    ? veraTelemetry.ai_voice_probability
+    : (veraTelemetry?.voice_integrity_score !== undefined && veraTelemetry?.voice_integrity_score !== null
+        ? Math.max(0, 1 - (veraTelemetry.voice_integrity_score > 1 ? veraTelemetry.voice_integrity_score / 100 : veraTelemetry.voice_integrity_score))
+        : 0.03); // Default clean baseline (3%) when no audio / initial connection
+
+  const aiVoicePercent = Math.round(rawAiVoice * 100);
   const decision = veraTelemetry?.decision?.toUpperCase() || 'ALLOW';
 
-  const isHighThreat = riskLevel === 'high' || riskLevel === 'critical' || decision === 'BLOCK';
+  const isHighThreat = riskLevel === 'high' || riskLevel === 'critical' || decision === 'BLOCK' || aiVoicePercent > 60;
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
@@ -430,27 +438,43 @@ const CallScreen: React.FC = () => {
                 </div>
               </div>
 
-              {/* Voice Integrity (Deepfake) Card */}
+              {/* Calibrated AI Voice Likelihood / Synthetic Risk Card */}
               <div className="p-3.5 bg-[#0d1627] border border-[#1a2333] rounded-2xl space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-400 flex items-center gap-1">
-                    <Fingerprint size={12} className="text-blue-400" />
-                    Voice Authenticity
+                    <Fingerprint size={12} className={aiVoicePercent <= 25 ? 'text-emerald-400' : aiVoicePercent <= 60 ? 'text-amber-400' : 'text-rose-400'} />
+                    AI Voice Likelihood
+                  </span>
+                  <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                    aiVoicePercent <= 25 ? 'bg-emerald-950/60 text-emerald-400' :
+                    aiVoicePercent <= 60 ? 'bg-amber-950/60 text-amber-400' :
+                    'bg-rose-950/60 text-rose-400'
+                  }`}>
+                    {aiVoicePercent <= 25 ? 'GENUINE' : aiVoicePercent <= 60 ? 'EVALUATING' : 'SYNTHETIC'}
                   </span>
                 </div>
-                <div className="text-xl font-bold text-white font-mono">{voiceIntegrity}%</div>
+                <div className="text-xl font-bold text-white font-mono flex items-baseline gap-1">
+                  <span>{aiVoicePercent}%</span>
+                  <span className="text-[10px] font-normal text-gray-400">risk</span>
+                </div>
                 <div className="w-full h-1.5 bg-[#070b14] rounded-full overflow-hidden">
                   <div 
                     className={`h-full transition-all duration-300 ${
-                      voiceIntegrity > 70 ? 'bg-emerald-500' :
-                      voiceIntegrity > 40 ? 'bg-amber-500' :
+                      aiVoicePercent <= 25 ? 'bg-emerald-500' :
+                      aiVoicePercent <= 60 ? 'bg-amber-500' :
                       'bg-rose-500'
                     }`}
-                    style={{ width: `${voiceIntegrity}%` }}
+                    style={{ width: `${Math.min(100, Math.max(2, aiVoicePercent))}%` }}
                   ></div>
                 </div>
-                <div className="text-[10px] text-gray-500">
-                  {voiceIntegrity < 40 ? '⚠️ Synthetic / Cloned' : 'Authentic Human'}
+                <div className={`text-[10px] font-medium ${
+                  aiVoicePercent <= 25 ? 'text-emerald-400' :
+                  aiVoicePercent <= 60 ? 'text-amber-400' :
+                  'text-rose-400'
+                }`}>
+                  {aiVoicePercent <= 25 ? 'Authentic Human Voice' :
+                   aiVoicePercent <= 60 ? 'Acoustic Noise / Compression' :
+                   '⚠️ High AI / Deepfake Threat'}
                 </div>
               </div>
 
